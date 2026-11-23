@@ -43,6 +43,13 @@
       <version>1.6.3</version>
     </dependency>
 
+    <!-- ODS lesen/schreiben, keine Laufzeitabhängigkeiten (siehe knowledge/decisions.md) -->
+    <dependency>
+      <groupId>com.github.miachm.sods</groupId>
+      <artifactId>SODS</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+
     <!-- nur Tests: prüft PDF/A-3 (veraPDF) und eingebettete XML -->
     <dependency>
       <groupId>org.mustangproject</groupId>

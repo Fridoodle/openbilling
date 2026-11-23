@@ -9,6 +9,13 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Lösung:** `-D`-Argumente in einfache Anführungszeichen setzen: `mvn test '-Dtest=FacturXSpikeTest'`.
 - **Quelle:** Windows PowerShell 5.1, 2026-11-23.
 
+## SODS: Zahlen kommen als Double, Text-Format per Data-Style "@"
+
+- **Symptom:** Getippte Beträge liest SODS als `Double`. Eine als Zahl getippte PLZ `01067` würde zu `1067`.
+- **Ursache:** ODS speichert Zahlen als `office:value-type="float"`, und SODS gibt dafür `Double` zurück. Datumszellen kommen als `LocalDate`, leere Zellen als `null`.
+- **Lösung:** Beträge mit `BigDecimal.valueOf(double)` umwandeln (kürzeste Darstellung, für getippte Werte exakt), nie `new BigDecimal(double)`. Spalten für PLZ, IBAN, Steuernummer usw. mit `Style.setDataStyle("@")` als Spaltenvorgabe (`setDefaultColumnCellStyle`) auf Text stellen. SODS schreibt dann `number:text-style`, sodass neu getippte Werte Text bleiben. Formelergebnisse nie als Eingabe lesen, denn sie können Float-Reste enthalten.
+- **Quelle:** SODS 1.10.1, `RechnungOds`, `RechnungOdsTest.plzBleibtText`, 2026-11-23. Verhalten in LibreOffice selbst (unverifiziert).
+
 ## PowerShell 5.1 schreibt UTF-8 mit BOM, javac scheitert daran
 
 - **Symptom:** `illegal character: '﻿'` beim Kompilieren, nachdem eine `.java`-Datei mit `Set-Content -Encoding utf8` oder `Out-File -Encoding utf8` bearbeitet wurde.

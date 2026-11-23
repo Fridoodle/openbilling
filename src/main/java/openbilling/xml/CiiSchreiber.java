@@ -150,13 +150,19 @@ public final class CiiSchreiber {
         text("Name", p.name());
         if (p.kontakt() != null) { // BG-6 / BG-9
             start("DefinedTradeContact");
-            text("PersonName", p.kontakt().name());
-            start("TelephoneUniversalCommunication");
-            text("CompleteNumber", p.kontakt().telefon());
-            end();
-            start("EmailURIUniversalCommunication");
-            text("URIID", p.kontakt().email());
-            end();
+            if (p.kontakt().name() != null) {
+                text("PersonName", p.kontakt().name()); // BT-41 / BT-56
+            }
+            if (p.kontakt().telefon() != null) {
+                start("TelephoneUniversalCommunication");
+                text("CompleteNumber", p.kontakt().telefon()); // BT-42 / BT-57
+                end();
+            }
+            if (p.kontakt().email() != null) {
+                start("EmailURIUniversalCommunication");
+                text("URIID", p.kontakt().email()); // BT-43 / BT-58
+                end();
+            }
             end();
         }
         adresse(p.adresse());
