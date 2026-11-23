@@ -39,6 +39,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -84,6 +85,8 @@ public final class Fenster extends JFrame {
     private final List<JMenuItem> nurMitRechnung = new ArrayList<>();
     private JButton erstellen;
     private Path datei;
+    /** Name der Vorlage, aus der die offene Rechnung entstanden ist, sonst {@code null}. */
+    private String vorlage;
     private boolean offen;
     private boolean geaendert;
     private Pruefung pruefung;
@@ -267,6 +270,7 @@ public final class Fenster extends JFrame {
         offen = false;
         geaendert = false;
         datei = null;
+        vorlage = null;
         karten.show(inhalt, "start");
         getRootPane().setDefaultButton(erstellen);
         melde("Vorlagen liegen in " + einstellungen.vorlagen());
@@ -301,6 +305,7 @@ public final class Fenster extends JFrame {
             Entwurf e = RechnungOds.leseEntwurf(einstellungen.vorlagen().resolve(name + ".ods"));
             e.daten().putIfAbsent("BT-2", LocalDate.now().format(DatumFeld.FORMAT));
             zeigeRechnung(e, null);
+            vorlage = name;
         });
     }
 
@@ -312,6 +317,7 @@ public final class Fenster extends JFrame {
         if (p != null) {
             versuche(() -> {
                 zeigeRechnung(RechnungOds.leseEntwurf(p), p);
+                vorlage = null;
                 einstellungen.setze(ORDNER, p.toAbsolutePath().getParent().toString());
             });
         }
@@ -337,11 +343,25 @@ public final class Fenster extends JFrame {
         });
     }
 
+    /** Neue Vorlage anlegen oder eine vorhandene überschreiben; vorgeschlagen ist die Vorlage der Rechnung. */
     private void speichereVorlage() {
-        String name = JOptionPane.showInputDialog(this,
-                "Name der Vorlage.\nRechnungsnummer und Datumsangaben werden nicht übernommen, alles andere schon.",
-                "Als Vorlage speichern", JOptionPane.PLAIN_MESSAGE);
-        if (name == null || name.isBlank()) {
+        JComboBox<String> wahl = new JComboBox<>();
+        for (int i = 0; i < vorlagen.size(); i++) {
+            wahl.addItem(vorlagen.get(i));
+        }
+        wahl.setEditable(true);
+        wahl.setSelectedItem(vorlage != null ? vorlage : "");
+        JPanel p = new JPanel(new BorderLayout(0, 8));
+        p.add(new JLabel("<html>Neuen Namen eingeben oder eine vorhandene Vorlage zum Überschreiben wählen.<br>"
+                + "Rechnungsnummer und Datumsangaben werden nicht übernommen, alles andere schon.</html>"),
+                BorderLayout.NORTH);
+        p.add(wahl);
+        if (JOptionPane.showConfirmDialog(this, p, "Als Vorlage speichern", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        String name = String.valueOf(wahl.getEditor().getItem());
+        if (name.isBlank()) {
             return;
         }
         Path ziel = einstellungen.vorlagen().resolve(dateiname(name) + ".ods");
@@ -354,6 +374,11 @@ public final class Fenster extends JFrame {
         versuche(() -> {
             Files.createDirectories(ziel.getParent());
             RechnungOds.schreibe(new Entwurf(daten, e.positionen()), ziel);
+            String n = dateiname(name);
+            if (!vorlagen.contains(n)) {
+                vorlagen.addElement(n);
+            }
+            vorlage = n;
             melde("Vorlage gespeichert: " + ziel);
         });
     }
