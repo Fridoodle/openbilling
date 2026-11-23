@@ -139,10 +139,9 @@ final class Formular extends JPanel implements Scrollable {
                 + " z. B. eine Lieferanten- oder Geschäftsnummer (Regel BR-CO-26).");
         felder.get("BT-29").putClientProperty("JTextField.placeholderText", "ohne USt-IdNr.");
 
-        JPanel knoepfe = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        knoepfe.add(knopf("Aus Adressbuch…", ausAdressbuch));
-        knoepfe.add(knopf("Im Adressbuch speichern", insAdressbuch));
-        JPanel empfaenger = abschnitt("Empfänger", knoepfe);
+        // Steht neben „Firmenname im PDF-Kopf“, damit die Adressfelder beider Seiten auf einer Höhe liegen
+        JPanel empfaenger = abschnitt("Empfänger", null);
+        empfaenger.add(zeile(adressbuch(ausAdressbuch, insAdressbuch), 1));
         partei(empfaenger, "Empfänger", "BT-44", "BT-50", "BT-53", "BT-52", "BT-55", "BT-56", "BT-57", "BT-58",
                 "BT-49");
         empfaenger.add(zeile(feld("BT-48", "USt-IdNr.", "Empfänger"), 1,
@@ -308,13 +307,23 @@ final class Formular extends JPanel implements Scrollable {
         return p;
     }
 
-    private static JButton knopf(String text, Runnable aktion) {
-        JButton b = new JButton(text);
-        b.putClientProperty("JButton.buttonType", "borderless");
-        b.putClientProperty("FlatLaf.styleClass", "small");
-        b.setFocusable(false);
-        b.addActionListener(e -> aktion.run());
-        return b;
+    /** Adressbuch-Knöpfe, beschriftet und so hoch wie ein Eingabefeld. */
+    private static JComponent adressbuch(Runnable aus, Runnable ins) {
+        JPanel knoepfe = new JPanel(new GridLayout(1, 2, 12, 0));
+        int hoehe = new JTextField().getPreferredSize().height;
+        for (JButton b : new JButton[] {new JButton("Aus Adressbuch wählen…"), new JButton("Im Adressbuch speichern")}) {
+            b.setFocusable(false);
+            b.setPreferredSize(new Dimension(10, hoehe));
+            knoepfe.add(b);
+        }
+        ((JButton) knoepfe.getComponent(0)).addActionListener(e -> aus.run());
+        ((JButton) knoepfe.getComponent(1)).addActionListener(e -> ins.run());
+        JLabel l = gedaempft(new JLabel("Adressbuch"));
+        l.putClientProperty("FlatLaf.styleClass", "small");
+        JPanel p = new JPanel(new BorderLayout(0, 3));
+        p.add(l, BorderLayout.NORTH);
+        p.add(knoepfe);
+        return p;
     }
 
     private JComponent positionsteil() {
