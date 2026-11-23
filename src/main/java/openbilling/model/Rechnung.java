@@ -30,6 +30,8 @@ import java.util.List;
  * @param leistungBis     BT-74 Ende des Leistungszeitraums (BG-14), optional
  * @param schlussformel   kein BT: Grußformel am Ende der Sichtkopie (z. B. Dank und Unterschrift), nur im PDF,
  *                        nicht in der XRechnung, optional, darf mehrzeilig sein
+ * @param firmenname      kein BT: Name oben rechts im Kopf der Sichtkopie, nur im PDF, optional;
+ *                        leer gilt der Verkäufername (BT-27)
  */
 public record Rechnung(
         String spezifikation,
@@ -51,7 +53,24 @@ public record Rechnung(
         String bemerkung,
         LocalDate leistungVon,
         LocalDate leistungBis,
-        String schlussformel) {
+        String schlussformel,
+        String firmenname) {
+
+    /** Ohne Firmenname. */
+    public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
+            String waehrung, LocalDate faelligAm, String kaeuferReferenz, String zahlungsbedingungen,
+            LocalDate lieferdatum, Partei verkaeufer, Partei kaeufer, Zahlung zahlung, String befreiungsgrund,
+            BigDecimal vorausbezahlt, List<Position> positionen, String bemerkung, LocalDate leistungVon,
+            LocalDate leistungBis, String schlussformel) {
+        this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, bemerkung, leistungVon, leistungBis, schlussformel, null);
+    }
+
+    /** Name oben rechts im PDF: der Firmenname, sonst der Verkäufername (BT-27). */
+    public String kopfname() {
+        return firmenname == null || firmenname.isBlank() ? verkaeufer.name() : firmenname.strip();
+    }
 
     /** Ohne Schlussformel. */
     public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,

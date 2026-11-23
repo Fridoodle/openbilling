@@ -72,6 +72,20 @@ class PdfExportTest {
     }
 
     @Test
+    void firmennameStehtImKopfNameBleibtBeimAbsender() throws Exception {
+        var r = Testdaten.mitFirmenname("Studio Beispiel");
+        try (var doc = Loader.loadPDF(PdfExport.sicht(r))) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.startsWith("Studio Beispiel\n"), text);
+            assertTrue(text.contains(r.verkaeufer().name()), text);
+        }
+        try (var doc = Loader.loadPDF(PdfExport.sicht(Testdaten.mitFirmenname(" ")))) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.startsWith(Testdaten.minimal().verkaeufer().name() + "\n"), text);
+        }
+    }
+
+    @Test
     void vielePositionenPassenDurchKleinereSchriftAufEineSeite() throws Exception {
         var r = Testdaten.rechnung(IntStream.rangeClosed(1, 32)
                 .mapToObj(i -> Testdaten.pos(String.valueOf(i), "1", "10.00", Steuerkategorie.S, "19")).toList());
