@@ -38,10 +38,16 @@ Das Rechnungsmodell (`openbilling.model`) ist die zentrale Schicht: ODS-Parser (
 .\tools\maven\bin\mvn.cmd compile                   # Build
 .\tools\maven\bin\mvn.cmd test                      # alle Tests
 .\tools\maven\bin\mvn.cmd test '-Dtest=<Klasse>'    # einzelner Test
-.\tools\maven\bin\mvn.cmd package                   # JAR bauen
+.\tools\maven\bin\mvn.cmd package                   # target\openbilling.jar + target\lib\ (Tests laufen mit)
+java -jar target\openbilling.jar                    # Hilfe
+java -jar target\openbilling.jar neu rechnung.ods   # neue Rechnung aus %APPDATA%\openbilling\vorlagen\standard.ods
+java -jar target\openbilling.jar pruefen rechnung.ods
+java -jar target\openbilling.jar export rechnung.ods   # rechnung.xml + rechnung.pdf (PDF/A-3 mit XML)
 ```
 
-`FacturXSpikeTest` erzeugt aus `tests/fixtures/minimal-cii.xml` ein Hybrid-PDF in `out/spike/` und prüft es mit veraPDF (über Mustangs Validator).
+Exit-Codes der CLI: 0 ok, 1 Rechnung ungültig, 2 Bedienfehler oder ODS unvollständig. Der Validator braucht `tools/kosit/config` relativ zum Arbeitsverzeichnis, oder `kosit.konfiguration=<pfad>` in `%APPDATA%\openbilling\einstellungen.properties`.
+
+**Nach jeder Änderung an Abhängigkeiten das gebaute JAR einmal von Hand starten** (`export` auf eine Kopie von `tests/fixtures/minimal.ods`). Der Test-Classpath enthält mehr als das ausgelieferte Programm, grüne Tests beweisen also nicht, dass das JAR läuft (siehe `lessons-learned.md`, JAXB).
 
 ## Fachwissen: zuerst `knowledge/` lesen
 

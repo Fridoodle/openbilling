@@ -42,6 +42,14 @@
       <artifactId>validator</artifactId>
       <version>1.6.3</version>
     </dependency>
+    <!-- vom KoSIT-Validator als optional deklariert, zur Laufzeit aber nötig (lessons-learned.md);
+         Version wie im Validator-POM (version.jaxb-impl) -->
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <version>4.0.8</version>
+      <scope>runtime</scope>
+    </dependency>
 
     <!-- ODS lesen/schreiben, keine Laufzeitabhängigkeiten (siehe knowledge/decisions.md) -->
     <dependency>
@@ -65,11 +73,43 @@
   </dependencies>
 
   <build>
+    <finalName>openbilling</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.4</version>
+      </plugin>
+      <!-- java -jar target/openbilling.jar: Abhängigkeiten liegen daneben in target/lib -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>openbilling.Main</mainClass>
+              <addClasspath>true</addClasspath>
+              <classpathPrefix>lib/</classpathPrefix>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>lib</id>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

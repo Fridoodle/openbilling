@@ -2,11 +2,25 @@
 
 Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · Lösung · Quelle/Commit.
 
+## KoSIT-Validator als Bibliothek: JAXB-Laufzeit fehlt im JAR, Tests sind trotzdem grün
+
+- **Symptom:** `java -jar target\openbilling.jar export …` bricht ab mit `Implementation of Jakarta XML Binding-API has not been found` (`ClassNotFoundException: org.glassfish.jaxb.runtime.v2.ContextFactory`). Alle Tests liefen vorher durch.
+- **Ursache:** `org.kosit:validator` 1.6.3 deklariert `org.glassfish.jaxb:jaxb-runtime` als `optional`, deshalb zieht Maven es nicht mit. Im Test kam es zufällig über die Test-Abhängigkeit `org.mustangproject:validator` auf den Classpath.
+- **Lösung:** `org.glassfish.jaxb:jaxb-runtime` in der Version des Validator-POMs (`version.jaxb-impl`, 4.0.8) als `runtime`-Abhängigkeit eintragen. Allgemein: Nach Änderungen an Abhängigkeiten das gebaute JAR von Hand starten, denn der Test-Classpath ist größer als der ausgelieferte.
+- **Quelle:** `pom.xml`, 2026-11-23.
+
+## Mustang 2.26.0: `ZUGFeRDVisualizer.toPDF(xml, sprache)` liefert NullPointerException
+
+- **Symptom:** `NullPointerException: … because "fopInput" is null` in `ZUGFeRDVisualizer.toPDFfromFOP`, auch mit einer gültigen Fixture.
+- **Ursache:** Fehler in der Variante, die das PDF als `byte[]` zurückgibt (in Mustang 2.26.0, Ursache nicht weiter untersucht).
+- **Lösung:** Die Variante `toPDF(xmlDatei, pdfDatei, sprache)` benutzen, die in eine Datei schreibt, und die Datei danach lesen (`PdfExport`). Bei einem Mustang-Update prüfen, ob der Fehler behoben ist.
+- **Quelle:** `PdfExport`, `PdfExportTest`, 2026-11-23.
+
 ## Maven unter PowerShell: `-D`-Argumente mit Punkt quoten
 
 - **Symptom:** `Unknown lifecycle phase ".txt"` bei `mvn dependency:tree -DoutputFile=out\deps.txt`.
 - **Ursache:** PowerShell zerlegt ein ungequotetes Argument der Form `-Dname=wert.endung` am Punkt.
-- **Lösung:** `-D`-Argumente in einfache Anführungszeichen setzen: `mvn test '-Dtest=FacturXSpikeTest'`.
+- **Lösung:** `-D`-Argumente in einfache Anführungszeichen setzen: `mvn test '-Dtest=PdfExportTest'`.
 - **Quelle:** Windows PowerShell 5.1, 2026-11-23.
 
 ## SODS: Zahlen kommen als Double, Text-Format per Data-Style "@"

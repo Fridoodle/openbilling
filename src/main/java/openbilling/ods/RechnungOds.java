@@ -144,12 +144,17 @@ public final class RechnungOds {
 
     // ---------------------------------------------------------------- Schreiben
 
-    /** Leere Vorlage mit Vorgaben (Währung, Land, XRechnung-Version …). */
+    /** Leere Vorlage mit Vorgaben (Währung, Land, XRechnung 3.0 …). */
     public static void vorlage(Path ziel) throws IOException {
+        vorlage(ziel, XRECHNUNG_30);
+    }
+
+    /** Leere Vorlage mit Vorgaben; {@code spezifikation} ist BT-24 (aus den Einstellungen). */
+    public static void vorlage(Path ziel, String spezifikation) throws IOException {
         Map<String, Object> w = new HashMap<>();
         w.put("BT-3", "380");
         w.put("BT-5", "EUR");
-        w.put("BT-24", XRECHNUNG_30);
+        w.put("BT-24", spezifikation);
         w.put("BT-40", "DE");
         w.put("BT-55", "DE");
         w.put("BT-34-1", "EM");
