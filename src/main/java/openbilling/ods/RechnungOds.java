@@ -52,6 +52,15 @@ public final class RechnungOds {
     public static final String XRECHNUNG_30 =
             "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0";
 
+    /**
+     * Vorgaben einer neuen Rechnung. BT-23 ist in XRechnung Pflicht (PEPPOL-EN16931-R001); der Wert ist
+     * der übliche Standardprozess.
+     */
+    public static final Map<String, String> VORGABEN = Map.of(
+            "BT-3", "380", "BT-5", "EUR", "BT-24", XRECHNUNG_30,
+            "BT-23", "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
+            "BT-40", "DE", "BT-55", "DE", "BT-34-1", "EM", "BT-49-1", "EM", "BT-81", "58");
+
     /** Zeilen des Blatts Daten in Anzeigereihenfolge. Eintrag ohne "BT-" ist eine Überschrift. */
     private static final String[] DATEN = {
         "Rechnung",
@@ -60,11 +69,14 @@ public final class RechnungOds {
         "BT-3 Rechnungsart (380 Rechnung, 381 Gutschrift, 384 Korrektur)",
         "BT-5 Währung",
         "BT-72 Liefer-/Leistungsdatum",
+        "BT-73 Leistungszeitraum von (optional)",
+        "BT-74 Leistungszeitraum bis (optional)",
         "BT-9 Fällig am",
         "BT-20 Zahlungsbedingungen",
         "BT-10 Leitweg-ID / Käuferreferenz (Pflicht)",
         "BT-120 Grund der Steuerbefreiung (bei Kategorie ungleich S)",
         "BT-113 Bereits gezahlt",
+        "BT-22 Bemerkung (optional)",
         "BT-24 Spezifikation (XRechnung-Version)",
         "BT-23 Geschäftsprozess (optional)",
         "Verkäufer",
@@ -117,6 +129,7 @@ public final class RechnungOds {
         "BT-149 Preis je Menge (optional)",
         "BT-151 Steuerkategorie (S, E, AE, …)",
         "BT-152 Steuersatz %",
+        "BT-154 Beschreibung (optional)",
         "BT-131 Zeilenbetrag (berechnet)",
     };
 
@@ -125,9 +138,9 @@ public final class RechnungOds {
 
     /** Eingabespalten des Blatts Positionen, in dieser Reihenfolge stehen sie in {@link Entwurf#positionen}. */
     public static final List<String> POSITIONSFELDER =
-            List.of("BT-126", "BT-153", "BT-129", "BT-130", "BT-146", "BT-149", "BT-151", "BT-152");
+            List.of("BT-126", "BT-153", "BT-129", "BT-130", "BT-146", "BT-149", "BT-151", "BT-152", "BT-154");
 
-    private static final java.util.Set<String> DATUMSFELDER = java.util.Set.of("BT-2", "BT-9", "BT-72");
+    private static final java.util.Set<String> DATUMSFELDER = java.util.Set.of("BT-2", "BT-9", "BT-72", "BT-73", "BT-74");
     private static final java.util.Set<String> ZAHLENFELDER =
             java.util.Set.of("BT-113", "BT-129", "BT-146", "BT-149", "BT-152");
 
@@ -167,15 +180,8 @@ public final class RechnungOds {
 
     /** Leere Vorlage mit Vorgaben; {@code spezifikation} ist BT-24 (aus den Einstellungen). */
     public static void vorlage(Path ziel, String spezifikation) throws IOException {
-        Map<String, Object> w = new HashMap<>();
-        w.put("BT-3", "380");
-        w.put("BT-5", "EUR");
+        Map<String, Object> w = new HashMap<>(VORGABEN);
         w.put("BT-24", spezifikation);
-        w.put("BT-40", "DE");
-        w.put("BT-55", "DE");
-        w.put("BT-34-1", "EM");
-        w.put("BT-49-1", "EM");
-        w.put("BT-81", "58");
         speichere(w, List.of(), ziel);
     }
 
@@ -187,6 +193,9 @@ public final class RechnungOds {
         w.put("BT-3", r.typ());
         w.put("BT-5", r.waehrung());
         w.put("BT-72", r.lieferdatum());
+        w.put("BT-73", r.leistungVon());
+        w.put("BT-74", r.leistungBis());
+        w.put("BT-22", r.bemerkung());
         w.put("BT-9", r.faelligAm());
         w.put("BT-20", r.zahlungsbedingungen());
         w.put("BT-10", r.kaeuferReferenz());
@@ -216,7 +225,7 @@ public final class RechnungOds {
         for (int i = 0; i < r.positionen().size(); i++) {
             Position p = r.positionen().get(i);
             zeilen.add(new Object[] {p.id(), p.bezeichnung(), p.menge(), p.einheit(), p.nettopreis(),
-                p.basismenge(), p.kategorie().name(), p.steuersatz(), e.zeilenbetraege().get(i)});
+                p.basismenge(), p.kategorie().name(), p.steuersatz(), p.beschreibung(), e.zeilenbetraege().get(i)});
         }
         speichere(w, zeilen, ziel);
     }
@@ -303,7 +312,7 @@ public final class RechnungOds {
 
         int leer = 20; // freie Zeilen zum Ausfüllen
         Sheet pos = new Sheet(BLATT_POSITIONEN, 1 + Math.max(positionen.size(), leer), POSITIONEN.length);
-        for (int c : new int[] {0, 1, 3, 6}) {
+        for (int c : new int[] {0, 1, 3, 6, 8}) {
             pos.setDefaultColumnCellStyle(c, text);
         }
         pos.setColumnWidth(1, 80.0);
@@ -416,6 +425,12 @@ public final class RechnungOds {
         BigDecimal voraus = f.zahl("BT-113", false);
         String spezifikation = f.pflicht("BT-24");
         String prozess = f.text("BT-23");
+        String bemerkung = f.text("BT-22");
+        LocalDate von = f.datum("BT-73", false);
+        LocalDate bis = f.datum("BT-74", false);
+        if (von != null && bis != null && bis.isBefore(von)) {
+            probleme.add(BLATT_DATEN + ", BT-74: Leistungszeitraum endet vor seinem Beginn (BR-29)");
+        }
 
         List<Position> positionen = positionen(posZellen, probleme);
         if (positionen.isEmpty() && probleme.isEmpty()) {
@@ -425,7 +440,8 @@ public final class RechnungOds {
             throw new OdsFehler(probleme);
         }
         return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faellig, referenz,
-                bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen);
+                bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen,
+                bemerkung, von, bis);
     }
 
     private static Kontakt kontakt(Felder f, String name, String telefon, String email) {
@@ -509,7 +525,7 @@ public final class RechnungOds {
             }
             if (probleme.isEmpty()) {
                 liste.add(new Position(id != null ? id : String.valueOf(liste.size() + 1), bezeichnung, menge,
-                        einheit, preis, basis, kategorie, satz));
+                        einheit, preis, basis, kategorie, satz, f.text("BT-154")));
             }
         }
         return liste;

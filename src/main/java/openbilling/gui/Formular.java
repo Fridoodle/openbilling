@@ -30,7 +30,9 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
@@ -39,6 +41,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.JTextComponent;
 import openbilling.model.Berechnung;
 import openbilling.model.Rechnung;
 import openbilling.model.Rechnung.Position;
@@ -70,12 +73,12 @@ final class Formular extends JPanel implements Scrollable {
 
     // Spalten des Tabellenmodells; BASIS (BT-149) wird nicht angezeigt, aber mitgeführt
     private static final int POS = 0, TEXT = 1, MENGE = 2, EINHEIT = 3, PREIS = 4, STEUER = 5, BETRAG_SPALTE = 6,
-            BASIS = 7;
+            BASIS = 7, BESCHREIBUNG = 8;
 
-    private final Map<String, JTextField> felder = new LinkedHashMap<>();
+    private final Map<String, JTextComponent> felder = new LinkedHashMap<>();
     private final Map<String, String> namen = new HashMap<>();
     private final DefaultTableModel positionen = new DefaultTableModel(
-            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", ""}, 0) {
+            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", "", ""}, 0) {
         @Override
         public boolean isCellEditable(int zeile, int spalte) {
             return spalte != BETRAG_SPALTE;
@@ -85,6 +88,8 @@ final class Formular extends JPanel implements Scrollable {
     private final JLabel netto = new JLabel();
     private final JLabel steuer = new JLabel();
     private final JLabel gesamt = new JLabel();
+    private final JTextArea beschreibung = new JTextArea(4, 4);
+    private boolean waehlt;
     private Map<String, String> rest = new HashMap<>();
     private boolean laedt;
 
@@ -97,14 +102,22 @@ final class Formular extends JPanel implements Scrollable {
 
         JPanel kopf = abschnitt("Rechnung", null);
         kopf.add(zeile(feld("BT-1", "Rechnungsnummer", "Rechnung"), 3, feld("BT-2", "Rechnungsdatum", "Rechnung"), 2,
-                feld("BT-72", "Leistungsdatum", "Rechnung"), 2, feld("BT-9", "Fällig am", "Rechnung"), 2));
-        kopf.add(zeile(feld("BT-10", "Käuferreferenz / Leitweg-ID", "Rechnung"), 3,
-                feld("BT-20", "Zahlungsbedingungen", "Rechnung"), 6));
+                feld("BT-9", "Fällig am", "Rechnung"), 2, feld("BT-10", "Käuferreferenz / Leitweg-ID", "Rechnung"), 2));
+        kopf.add(zeile(feld("BT-72", "Leistungsdatum", "Rechnung"), 3,
+                feld("BT-73", "oder Leistungszeitraum von", "Rechnung"), 2, feld("BT-74", "bis", "Rechnung"), 2,
+                new JPanel(), 2));
+        kopf.add(zeile(feld("BT-20", "Zahlungsbedingungen", "Rechnung"), 1));
+        kopf.add(zeile(feld("BT-22", "Bemerkung, z. B. Einleitung oder Bauvorhaben", "Rechnung"), 1));
+        tipp("BT-72", "Tag der Lieferung oder Leistung. Bei einem Zeitraum stattdessen von und bis ausfüllen.");
         tipp("BT-10", "Pflichtangabe. Bei Behörden die Leitweg-ID, sonst z. B. Bestell- oder Kundennummer.");
 
         JPanel absender = abschnitt("Absender", null);
         partei(absender, "Absender", "BT-27", "BT-35", "BT-38", "BT-37", "BT-40", "BT-41", "BT-42", "BT-43", "BT-34");
-        absender.add(zeile(feld("BT-31", "USt-IdNr.", "Absender"), 1, feld("BT-32", "Steuernummer", "Absender"), 1));
+        absender.add(zeile(feld("BT-31", "USt-IdNr.", "Absender"), 1, feld("BT-32", "Steuernummer", "Absender"), 1,
+                feld("BT-29", "Kennung", "Absender"), 1));
+        tipp("BT-29", "Nur ohne USt-IdNr. nötig: XRechnung verlangt dann eine eigene Kennung des Absenders,"
+                + " z. B. eine Lieferanten- oder Geschäftsnummer (Regel BR-CO-26).");
+        felder.get("BT-29").putClientProperty("JTextField.placeholderText", "ohne USt-IdNr.");
 
         JPanel knoepfe = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         knoepfe.add(knopf("Aus Adressbuch…", ausAdressbuch));
@@ -188,7 +201,9 @@ final class Formular extends JPanel implements Scrollable {
 
     /** Beschriftetes Eingabefeld, unter seiner BT-Kennung registriert. */
     private JComponent feld(String bt, String beschriftung, String gruppe) {
-        JTextField f = Set.of("BT-2", "BT-9", "BT-72").contains(bt) ? new DatumFeld() : new JTextField(4);
+        JTextComponent f = bt.equals("BT-22") ? mehrzeilig(new JTextArea(3, 4))
+                : Set.of("BT-2", "BT-9", "BT-72", "BT-73", "BT-74").contains(bt) ? new DatumFeld()
+                : new JTextField(4);
         f.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -211,8 +226,14 @@ final class Formular extends JPanel implements Scrollable {
         l.setLabelFor(f);
         JPanel p = new JPanel(new BorderLayout(0, 3));
         p.add(l, BorderLayout.NORTH);
-        p.add(f);
+        p.add(f instanceof JTextArea ? new JScrollPane(f) : f);
         return p;
+    }
+
+    private static JTextArea mehrzeilig(JTextArea a) {
+        a.setLineWrap(true);
+        a.setWrapStyleWord(true);
+        return a;
     }
 
     /** Zurückhaltende Textfarbe, die beim Wechsel des Designs mitgeht. */
@@ -256,6 +277,8 @@ final class Formular extends JPanel implements Scrollable {
         tabelle.putClientProperty("terminateEditOnFocusLost", true);
         tabelle.getTableHeader().setReorderingAllowed(false);
         tabelle.removeColumn(tabelle.getColumnModel().getColumn(BASIS));
+        tabelle.removeColumn(tabelle.getColumnModel().getColumn(BASIS)); // danach steht dort BESCHREIBUNG
+        tabelle.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         int[] breiten = {44, 420, 70, 100, 110, 150, 110};
         for (int i = 0; i < breiten.length; i++) {
             tabelle.getColumnModel().getColumn(i).setPreferredWidth(breiten[i]);
@@ -293,7 +316,7 @@ final class Formular extends JPanel implements Scrollable {
         JButton neu = new JButton("Position hinzufügen");
         neu.addActionListener(e -> {
             positionen.addRow(new Object[] {String.valueOf(positionen.getRowCount() + 1), "", "1", "Stück", "",
-                "19 %", "", null});
+                "19 %", "", null, null});
             int zeile = positionen.getRowCount() - 1;
             tabelle.changeSelection(zeile, TEXT, false, false);
             tabelle.editCellAt(zeile, TEXT);
@@ -313,8 +336,44 @@ final class Formular extends JPanel implements Scrollable {
         knoepfe.add(weg);
         knoepfe.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
 
+        // ausführlicher Text (BT-154) zur gerade gewählten Position
+        mehrzeilig(beschreibung).setEnabled(false);
+        tabelle.getSelectionModel().addListSelectionListener(e -> {
+            int zeile = tabelle.getSelectedRow();
+            waehlt = true;
+            beschreibung.setText(zeile < 0 || wert(zeile, BESCHREIBUNG) == null ? "" : wert(zeile, BESCHREIBUNG));
+            beschreibung.setEnabled(zeile >= 0);
+            waehlt = false;
+        });
+        beschreibung.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                uebernimm();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                uebernimm();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {}
+
+            private void uebernimm() {
+                if (!waehlt && tabelle.getSelectedRow() >= 0) {
+                    positionen.setValueAt(beschreibung.getText(), tabelle.getSelectedRow(), BESCHREIBUNG);
+                }
+            }
+        });
+        JLabel titel = gedaempft(new JLabel("Beschreibung der gewählten Position (optional, mehrzeilig)"));
+        titel.putClientProperty("FlatLaf.styleClass", "small");
+        JPanel detail = new JPanel(new BorderLayout(0, 3));
+        detail.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        detail.add(titel, BorderLayout.NORTH);
+        detail.add(new JScrollPane(beschreibung));
+
         JPanel p = abschnitt("Positionen", null);
-        for (JComponent teil : new JComponent[] {rahmen, knoepfe}) {
+        for (JComponent teil : new JComponent[] {rahmen, knoepfe, detail}) {
             teil.setAlignmentX(LEFT_ALIGNMENT);
             p.add(teil);
         }
@@ -373,7 +432,7 @@ final class Formular extends JPanel implements Scrollable {
         for (String[] z : e.positionen()) {
             BigDecimal preis = zahl(z[4]);
             positionen.addRow(new Object[] {z[0], z[1], z[2], einheit(z[3], 1, 0),
-                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5]});
+                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5], z[8]});
         }
         laedt = false;
         rechne();
@@ -382,6 +441,10 @@ final class Formular extends JPanel implements Scrollable {
     Entwurf entwurf() {
         beendeEingabe();
         Map<String, String> d = new LinkedHashMap<>(rest);
+        for (String bt : List.of("BT-3", "BT-5", "BT-23", "BT-24", "BT-81")) {
+            // Pflichtangaben ohne eigenes Feld: fehlen sie in einer alten Vorlage, gilt die Vorgabe
+            d.putIfAbsent(bt, openbilling.ods.RechnungOds.VORGABEN.get(bt));
+        }
         felder.forEach((bt, f) -> {
             if (f.getText().isBlank()) {
                 d.remove(bt);
@@ -403,7 +466,8 @@ final class Formular extends JPanel implements Scrollable {
         for (int i = 0; i < positionen.getRowCount(); i++) {
             String[] st = steuer(wert(i, STEUER));
             zeilen.add(new String[] {wert(i, POS), wert(i, TEXT), normal(wert(i, MENGE)),
-                einheit(wert(i, EINHEIT), 0, 1), normal(wert(i, PREIS)), wert(i, BASIS), st[0], st[1]});
+                einheit(wert(i, EINHEIT), 0, 1), normal(wert(i, PREIS)), wert(i, BASIS), st[0], st[1],
+                wert(i, BESCHREIBUNG)});
         }
         return new Entwurf(d, zeilen);
     }

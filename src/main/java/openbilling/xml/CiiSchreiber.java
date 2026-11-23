@@ -78,6 +78,11 @@ public final class CiiSchreiber {
         text("ID", r.nummer()); // BT-1
         text("TypeCode", r.typ()); // BT-3
         datum("IssueDateTime", r.datum()); // BT-2
+        if (r.bemerkung() != null) {
+            start("IncludedNote");
+            text("Content", r.bemerkung()); // BT-22
+            end();
+        }
         w.writeEndElement();
 
         w.writeStartElement(RSM, "SupplyChainTradeTransaction");
@@ -101,6 +106,9 @@ public final class CiiSchreiber {
         end();
         start("SpecifiedTradeProduct");
         text("Name", p.bezeichnung()); // BT-153
+        if (p.beschreibung() != null) {
+            text("Description", p.beschreibung()); // BT-154
+        }
         end();
         start("SpecifiedLineTradeAgreement");
         start("NetPriceProductTradePrice");
@@ -243,6 +251,17 @@ public final class CiiSchreiber {
             text("CategoryCode", g.kategorie().name()); // BT-118
             if (g.kategorie() != Steuerkategorie.O) {
                 text("RateApplicablePercent", g.satz().toPlainString()); // BT-119
+            }
+            end();
+        }
+
+        if (r.leistungVon() != null || r.leistungBis() != null) { // BG-14
+            start("BillingSpecifiedPeriod");
+            if (r.leistungVon() != null) {
+                datum("StartDateTime", r.leistungVon()); // BT-73
+            }
+            if (r.leistungBis() != null) {
+                datum("EndDateTime", r.leistungBis()); // BT-74
             }
             end();
         }

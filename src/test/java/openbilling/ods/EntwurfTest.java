@@ -33,12 +33,14 @@ class EntwurfTest {
     @Test
     void unvollstaendigerEntwurfLaesstSichSpeichernAberNichtPruefen(@TempDir Path tmp) throws Exception {
         Entwurf e = new Entwurf(Map.of("BT-27", "Muster GmbH", "BT-38", "01067", "BT-2", "23.11.2026"),
-                List.<String[]>of(new String[] {"1", "Beratung", "1,5", "HUR", "85", null, "S", "19"}));
+                List.<String[]>of(new String[] {"1", "Beratung", "1,5", "HUR", "85", null, "S", "19",
+                    "erste Zeile\nzweite Zeile"}));
         Path datei = tmp.resolve("vorlage.ods");
         RechnungOds.schreibe(e, datei);
         Entwurf gelesen = RechnungOds.leseEntwurf(datei);
         assertEquals(e.daten(), gelesen.daten());
         assertEquals("1,5", gelesen.positionen().get(0)[2]);
+        assertEquals("erste Zeile\nzweite Zeile", gelesen.positionen().get(0)[8]);
         OdsFehler f = assertThrows(OdsFehler.class, () -> RechnungOds.rechnung(gelesen));
         assertTrue(f.probleme().stream().anyMatch(p -> p.contains("BT-1:")), f.getMessage());
     }

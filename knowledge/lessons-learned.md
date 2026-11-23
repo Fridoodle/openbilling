@@ -72,6 +72,13 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Lösung:** Farben über FlatLaf-Stile setzen, z. B. `putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground")`, und in eigenen Rahmen oder Icons die Farbe erst in `paintBorder`/`paintIcon` aus dem `UIManager` holen. Umschalten mit `FlatDarkLaf.setup()` bzw. `FlatLightLaf.setup()` und danach `FlatLaf.updateUI()`.
 - **Quelle:** FlatLaf 3.8, `openbilling.gui.Formular.gedaempft`, 2026-11-23.
 
+## Zwei Ablehnungen, die bei Freiberuflern fast immer auftreten
+
+- **Symptom:** Der Validator lehnt eine sonst vollständige Rechnung ab mit `PEPPOL-EN16931-R001` („Business process MUST be provided“) oder `BR-CO-26`.
+- **Ursache:** XRechnung verlangt den Geschäftsprozess BT-23, obwohl er in EN 16931 optional ist. `BR-CO-26` verlangt vom Verkäufer eine USt-IdNr. (BT-31), eine Registernummer (BT-30) oder eine Verkäuferkennung (BT-29). Die Steuernummer (BT-32) allein genügt nicht, und viele Freiberufler haben nur diese.
+- **Lösung:** BT-23 mit `urn:fdc:peppol.eu:2017:poacc:billing:01:1.0` vorbelegen (`RechnungOds.VORGABEN`). Ohne USt-IdNr. eine Kennung in BT-29 eintragen (Feld „Kennung“ beim Absender); der Wert ist frei wählbar.
+- **Quelle:** KoSIT-Validator 1.6.3 mit XRechnung 3.0, 2026-11-23.
+
 ## Swing-Fenster ohne Bildschirm prüfen
 
 - **Symptom:** Ein Agent kann das Fenster nicht ansehen, ohne es auf dem Bildschirm des Nutzers zu öffnen.

@@ -75,14 +75,21 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Adressbuch:** `%APPDATA%\openbilling\kunden.ods`, Blatt `Kunden`, Kopfzeile mit BT-Kennungen (Käuferfelder plus BT-10), eine Zeile je Kunde (`openbilling.ods.Kunden`). Der Name (BT-44) ist der Schlüssel: Speichern unter gleichem Namen ersetzt den Eintrag.
 - **Vereinfachungen im Formular:** Bleibt die E-Rechnungs-Adresse (BT-34/BT-49) leer, gilt die E-Mail (BT-43/BT-58). Das Schema (BT-34-1/BT-49-1) wird abgeleitet: mit `@` ist es `EM`, sonst beim Käufer `0204` (Leitweg-ID). Einheit und Steuer wählt man als Klartext (Stück = C62, Stunde = HUR, pauschal = LS; „19 %“ = S, „0 %“ = Z, „steuerfrei“ = E, „Reverse Charge“ = AE …); eigene Codes und Sätze lassen sich eintippen.
 - **Exporte:** „Als PDF mit XRechnung“ prüft mit dem KoSIT-Validator und schreibt nur ein exportbereites Hybrid-PDF. „Als PDF“ schreibt nur die Sichtkopie (`PdfExport.sicht`) ohne Validator; das ist keine E-Rechnung. Anders als die CLI schreibt das Fenster keine separate `.xml`.
-- **Konsequenzen:** Das Fenster findet die Validator-Konfiguration wie die CLI nur über `tools/kosit/config` im Arbeitsverzeichnis oder die Einstellung `kosit.konfiguration` (siehe „Offen“). Design und zuletzt benutzter Ordner stehen in `einstellungen.properties` (`ansicht.dunkel`, `rechnungsordner`). Die Beispielrechnung eines Nutzers zeigt Angaben, die das Modell noch nicht kennt: Leistungszeitraum (BG-14, BT-73/74), einleitender Text (BT-22) und mehrzeilige Positionsbeschreibung (BT-154).
+- **Konsequenzen:** Das Fenster findet die Validator-Konfiguration wie die CLI nur über `tools/kosit/config` im Arbeitsverzeichnis oder die Einstellung `kosit.konfiguration` (siehe „Offen“). Design und zuletzt benutzter Ordner stehen in `einstellungen.properties` (`ansicht.dunkel`, `rechnungsordner`).
+
+## 2026-11-23 — Leistungszeitraum, Bemerkung und Positionsbeschreibung
+
+- **Kontext:** Eine typische Rechnung eines Nutzers (Architekturbüro) nennt einen Leistungszeitraum statt eines Leistungstags, einen einleitenden Text mit Bauvorhaben und Angebot sowie mehrzeilige Beschreibungen je Position. Die Sichtkopie entsteht aus der XML, und in einem Hybrid-PDF dürfen PDF und XML inhaltlich nicht voneinander abweichen. Diese Angaben müssen deshalb in die XML und können nicht nur im PDF stehen.
+- **Entscheidung:** Das Modell bekommt `Rechnung.bemerkung` (BT-22), `leistungVon`/`leistungBis` (BG-14, BT-73/74) und `Position.beschreibung` (BT-154). Die bisherigen Konstruktoren bleiben als Kurzform ohne diese Felder erhalten. CII: `ExchangedDocument/ram:IncludedNote/ram:Content` nach `IssueDateTime`, `ram:BillingSpecifiedPeriod` in `ApplicableHeaderTradeSettlement` zwischen `ApplicableTradeTax` und `SpecifiedTradePaymentTerms`, `ram:Description` nach `ram:Name` in `SpecifiedTradeProduct`. Mit dem KoSIT-Validator geprüft (`CiiSchreiberTest.leistungszeitraumBemerkungUndPositionsbeschreibung`).
+- **Datenvertrag:** Blatt `Daten` hat neu die optionalen Zeilen `BT-73`, `BT-74` und `BT-22`, Blatt `Positionen` die optionale Spalte `BT-154`. Ältere Dateien ohne diese Felder bleiben lesbar (`tests/fixtures/minimal.ods` ist unverändert). Mehrzeiliger Text in einer Zelle übersteht Schreiben und Lesen mit SODS.
+- **Vorgaben:** `RechnungOds.VORGABEN` ist die eine Stelle für Vorgabewerte neuer Rechnungen. Neu dabei ist BT-23 (`urn:fdc:peppol.eu:2017:poacc:billing:01:1.0`), ohne das der Validator ablehnt. Das Formular ergänzt fehlende Vorgaben für BT-3, BT-5, BT-23, BT-24 und BT-81, weil es dafür keine Eingabefelder hat. Die Verkäuferkennung (BT-29) hat jetzt ein Feld „Kennung“ beim Absender.
+- **Konsequenzen:** Die Mustang-Sichtkopie zeigt alle drei Angaben („Abrechnungszeitraum“, „Bemerkung“, „Beschreibung“).
 
 ## Offen
 
 - Validator-Konfiguration mit der App ausliefern (als Ressource im JAR oder beim ersten Start nach `%APPDATA%` entpacken).
 
 - Automatische Rechnungsnummer (Nummernschema und Zähler). Bisher trägt man die Nummer von Hand ein.
-- Modell, CII-Schreiber und Formular um Leistungszeitraum (BT-73/74), Bemerkung (BT-22) und Positionsbeschreibung (BT-154) erweitern.
 - Bedienung des Fensters (Menüs, Dialoge, Kalender, Export) ist bisher nur offscreen gerendert und über die Tests der Datenschicht geprüft, nicht von Hand durchgeklickt (unverifiziert).
 - Paketgröße: `target/lib` umfasst 63 JARs mit 43 MB, vor allem Mustang (FOP, Batik, ph-cii/ph-ubl) und Saxon. Ob sich Teile ausschließen lassen (z. B. ph-ubl, das nur für die CII→UBL-Umwandlung in Mustang nötig ist), ist noch zu prüfen (unverifiziert).
 - Syntax der erzeugten XML: Empfehlung CII D16B als Hauptformat (nötig für die Factur-X-Einbettung), UBL optional. Noch zu bestätigen.
