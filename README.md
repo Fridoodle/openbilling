@@ -40,6 +40,10 @@ Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm.
 2. Neue Rechnung aus der Vorlage erstellen, Kunde und Positionen eintragen. Pflichtfelder sind mit `*` markiert.
 3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als PDF mit XRechnung exportieren** (Strg+E) prüft und schreibt das Hybrid-PDF.
 
+Auch mitten in einer Rechnung geht **Datei → Neu aus Vorlage** (neue Rechnung aus einer Vorlage) und **Datei → Vorlage bearbeiten** (die Vorlage selbst öffnen; Speichern ändert dann die Vorlage). Ungespeicherte Änderungen fragt openbilling vorher ab.
+
+**Rechnung per Doppelklick öffnen:** Rechtsklick auf eine `.ods` → **Öffnen mit** → **Andere App auswählen** → **Nach einer App auf dem PC suchen** → `openbilling.exe` wählen. Mit „Immer“ öffnen alle `.ods` in openbilling, sonst bleibt LibreOffice der Standard und openbilling steht im Menü „Öffnen mit“. `openbilling.exe rechnung.ods` geht genauso.
+
 ### Kommandozeile
 
 `openbilling-cli.exe` liegt im selben Ordner:
