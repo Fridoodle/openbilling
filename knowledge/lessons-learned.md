@@ -132,3 +132,16 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** `setIconImages` setzt nur das Symbol des Fensters zur Laufzeit. Alles, was Windows ohne laufendes Programm anzeigt, liest das Symbol aus den Ressourcen von `openbilling.exe`. Ohne `--icon` setzt jpackage dort sein eigenes Standardsymbol ein.
 - **Lösung:** `jpackage --icon <datei.ico>`. Der zusätzliche Starter aus `--add-launcher` (`openbilling-cli.exe`) übernimmt das Symbol des Hauptstarters, wenn seine Properties-Datei kein `icon=` angibt. Prüfen ohne Installation: `[System.Drawing.Icon]::ExtractAssociatedIcon('openbilling.exe').ToBitmap().Save('x.png')` in PowerShell. Wer das Fenster per Skript sucht: Der jpackage-Starter startet sich als Kindprozess gleichen Namens noch einmal, das Fenster gehört dem Kind, nicht dem Prozess aus `Start-Process`. Eine .ico braucht kein Grafikwerkzeug: Kopf (6 Byte), je Bild ein 16-Byte-Verzeichniseintrag, dann die Bilder als BITMAPINFOHEADER mit doppelter Höhe plus BGRA-Zeilen von unten und 1-Bit-Maske (256 px als PNG), siehe `Symbol.ico()`.
 - **Quelle:** https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html (`--icon`), https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10) (ICO-Format), 2026-11-23.
+
+## ODS-Zahlen kommen als Double zurück: Prozentsätze und Beträge vor der XML normieren
+
+- **Symptom:** Nach `RechnungOds.schreibe` und `lese` steht in der XML `10.0` statt `10` (`CalculationPercent`) und `50.0` statt `50.00` (`ChargeAmount`). Der Validator akzeptiert beides, aber ein Byte-Vergleich der XML vor und nach dem ODS-Umweg schlägt fehl.
+- **Ursache:** SODS liefert Zahlzellen als `Double`; `BigDecimal.valueOf(10.0)` ergibt `10.0` mit Skala 1. Beträge, die durch `Berechnung` laufen, werden auf zwei Stellen gerundet, Eingabewerte wie Preis, Menge und Prozent nicht.
+- **Lösung:** Prozentsätze in `CiiSchreiber` über `satz()` (`stripTrailingZeros`) ausgeben. Tests vergleichen nach dem ODS-Umweg Beträge und Texte, nicht die ganze XML. Für BigDecimal-Vergleiche `compareTo` statt `equals` nutzen.
+- **Quelle:** `RechnungOdsTest.rabatteZuschlaegeUndSkontoUeberstehenOds`, 2026-11-23.
+
+## Datei-Bearbeitung unter Windows: kein Python, PowerShell 5.1 schreibt BOM
+
+- **Symptom:** `python3` startet nur den Microsoft-Store-Hinweis. `Out-File -Encoding utf8` bzw. `Set-Content -Encoding utf8` schreiben eine BOM; jshell bricht dann mit `illegal character: '﻿'` ab, und `java.util.Properties` würde die erste Zeile als Schlüssel mit BOM lesen.
+- **Lösung:** Für Skripte `-Encoding ascii` oder `[IO.File]::WriteAllText(pfad, text, (New-Object Text.UTF8Encoding $false))`. Für Quelltext-Änderungen die Edit-Werkzeuge oder `sed` aus Git Bash.
+- **Quelle:** eigene Erfahrung, 2026-11-23.

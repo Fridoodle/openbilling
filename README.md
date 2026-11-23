@@ -8,7 +8,7 @@ E-Rechnungen nach **XRechnung** erstellen, ohne Abo und ohne Cloud. openbilling 
 - **Vorlagen und Adressbuch:** Eigene Daten einmal in eine Vorlage eintragen, Kunden im Adressbuch speichern.
 - **Fenster und Kommandozeile:** Hell- und Dunkelmodus, dazu eine CLI für Skripte.
 
-> **Stand:** Version 0.1, frühe Phase. Unterstützt sind Rechnungen mit Überweisung, ohne Rabatte oder Zuschläge auf Belegebene. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
+> **Stand:** Version 0.1, frühe Phase. Unterstützt sind Rechnungen mit Überweisung, Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Lastschrift fehlt noch. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
 
 ## Installation (Windows)
 
@@ -42,7 +42,8 @@ Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm.
 `openbilling.exe` öffnet die Startseite mit deinen Vorlagen.
 
 1. Beim ersten Mal eine Rechnung aus der Standardvorlage anlegen, deine Firmen- und Bankdaten eintragen und über **Datei → Als Vorlage speichern** sichern. Ab dann hat jede neue Rechnung diese Daten.
-2. Neue Rechnung aus der Vorlage erstellen, Kunde und Positionen eintragen. Pflichtfelder sind mit `*` markiert.
+2. Neue Rechnung aus der Vorlage erstellen, Kunde und Positionen eintragen. Pflichtfelder sind mit `*` markiert. Die Rechnungsnummer schlägt openbilling vor: die zuletzt exportierte plus eins, im neuen Jahr wieder ab 1.
+   Rabatt auf eine Position gibst du in der Spalte **Rabatt %** ein. Rabatt und Zuschlag auf die ganze Rechnung (in Prozent oder als Betrag, z. B. Versand) sowie Skonto stehen unter **Rabatt, Zuschlag und Skonto**. Bei mehreren Steuersätzen verteilt openbilling Rabatt und Zuschlag anteilig.
 3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als PDF mit XRechnung exportieren** (Strg+E) prüft und schreibt das Hybrid-PDF.
 
 Auch mitten in einer Rechnung geht **Datei → Neu aus Vorlage** (neue Rechnung aus einer Vorlage) und **Datei → Vorlage bearbeiten** (die Vorlage selbst öffnen; Speichern ändert dann die Vorlage). Ungespeicherte Änderungen fragt openbilling vorher ab.
