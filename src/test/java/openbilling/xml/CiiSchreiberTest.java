@@ -73,6 +73,39 @@ class CiiSchreiberTest {
     }
 
     @Test
+    void rabatteZuschlaegeUndSkonto() throws Exception {
+        String xml = CiiSchreiber.schreibe(Testdaten.rabattiert());
+        assertTrue(xml.contains("<ram:CalculationPercent>10</ram:CalculationPercent>"), xml);
+        assertTrue(xml.contains("<ram:AllowanceTotalAmount>10.50</ram:AllowanceTotalAmount>"), xml);
+        assertTrue(xml.contains("<ram:ChargeTotalAmount>4.90</ram:ChargeTotalAmount>"), xml);
+        assertTrue(xml.contains("#SKONTO#TAGE=10#PROZENT=2.00#\n"), xml);
+        assertExportbereit(pruefe(Testdaten.rabattiert(), "rabatte"));
+    }
+
+    @Test
+    void skontoOhneFreitext() throws Exception {
+        var basis = Testdaten.minimal();
+        var r = new Rechnung(basis.spezifikation(), basis.prozess(), basis.nummer(), basis.datum(), basis.typ(),
+                basis.waehrung(), null, basis.kaeuferReferenz(), null, basis.lieferdatum(), basis.verkaeufer(),
+                basis.kaeufer(), basis.zahlung(), null, null, basis.positionen())
+                .mit(List.of(), new Rechnung.Skonto(14, b("3")));
+        assertExportbereit(pruefe(r, "skonto"));
+    }
+
+    @Test
+    void rabattUndZuschlagMitSteuerfreierPosition() throws Exception {
+        var v = Testdaten.VERKAEUFER;
+        var r = Testdaten.rechnung(List.of(pos("1", "1", "100.00", Steuerkategorie.S, "19"),
+                pos("2", "1", "50.00", Steuerkategorie.E, "0")))
+                .mit(List.of(new Rechnung.AbschlagZuschlag(false, b("10"), null, null),
+                        new Rechnung.AbschlagZuschlag(true, null, b("7.50"), "Verpackung")), null);
+        var mitGrund = new Rechnung(r.spezifikation(), r.prozess(), r.nummer(), r.datum(), r.typ(), r.waehrung(),
+                r.faelligAm(), r.kaeuferReferenz(), r.zahlungsbedingungen(), r.lieferdatum(), v, r.kaeufer(),
+                r.zahlung(), "Steuerfrei nach § 4 Nr. 21 UStG", null, r.positionen()).mit(r.abschlaegeZuschlaege(), null);
+        assertExportbereit(pruefe(mitGrund, "rabatt-e"));
+    }
+
+    @Test
     void kleinunternehmerNachParagraph19() throws Exception {
         var v = Testdaten.VERKAEUFER;
         // keine USt-IdNr. (BT-31): dann verlangt BR-CO-26 eine Verkäuferkennung (BT-29) oder BT-30

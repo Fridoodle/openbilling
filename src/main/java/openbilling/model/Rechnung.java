@@ -32,6 +32,8 @@ import java.util.List;
  *                        nicht in der XRechnung, optional, darf mehrzeilig sein
  * @param firmenname      kein BT: Name oben rechts im Kopf der Sichtkopie, nur im PDF, optional;
  *                        leer gilt der Verkäufername (BT-27)
+ * @param abschlaegeZuschlaege BG-20 Abschläge (Rabatte) und BG-21 Zuschläge auf die ganze Rechnung, ggf. leer
+ * @param skonto          Skonto, wird nach BR-DE-18 in BT-20 kodiert, optional
  */
 public record Rechnung(
         String spezifikation,
@@ -54,7 +56,28 @@ public record Rechnung(
         LocalDate leistungVon,
         LocalDate leistungBis,
         String schlussformel,
-        String firmenname) {
+        String firmenname,
+        List<AbschlagZuschlag> abschlaegeZuschlaege,
+        Skonto skonto) {
+
+    /** Ohne Abschläge, Zuschläge und Skonto. */
+    public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
+            String waehrung, LocalDate faelligAm, String kaeuferReferenz, String zahlungsbedingungen,
+            LocalDate lieferdatum, Partei verkaeufer, Partei kaeufer, Zahlung zahlung, String befreiungsgrund,
+            BigDecimal vorausbezahlt, List<Position> positionen, String bemerkung, LocalDate leistungVon,
+            LocalDate leistungBis, String schlussformel, String firmenname) {
+        this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, bemerkung, leistungVon, leistungBis, schlussformel, firmenname, List.of(), null);
+    }
+
+    /** Dieselbe Rechnung mit anderen Abschlägen, Zuschlägen und Skonto. */
+    public Rechnung mit(List<AbschlagZuschlag> abschlaegeZuschlaege, Skonto skonto) {
+        return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, bemerkung, leistungVon, leistungBis, schlussformel, firmenname, abschlaegeZuschlaege,
+                skonto);
+    }
 
     /** Ohne Firmenname. */
     public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
@@ -95,6 +118,7 @@ public record Rechnung(
 
     public Rechnung {
         positionen = List.copyOf(positionen);
+        abschlaegeZuschlaege = abschlaegeZuschlaege == null ? List.of() : List.copyOf(abschlaegeZuschlaege);
         if (positionen.isEmpty()) {
             throw new IllegalArgumentException("Rechnung braucht mindestens eine Position (BG-25)");
         }
@@ -152,6 +176,7 @@ public record Rechnung(
      * @param kategorie   BT-151
      * @param steuersatz  BT-152 in Prozent (bei Kategorie O ohne Bedeutung)
      * @param beschreibung BT-154 ausführlicher Text zur Position, optional, darf mehrzeilig sein
+     * @param rabatt      BT-138 Rabatt auf die Position in Prozent (BG-27 Zeilenabschlag), optional
      */
     public record Position(
             String id,
@@ -162,7 +187,14 @@ public record Rechnung(
             BigDecimal basismenge,
             Steuerkategorie kategorie,
             BigDecimal steuersatz,
-            String beschreibung) {
+            String beschreibung,
+            BigDecimal rabatt) {
+
+        /** Ohne Rabatt. */
+        public Position(String id, String bezeichnung, BigDecimal menge, String einheit, BigDecimal nettopreis,
+                BigDecimal basismenge, Steuerkategorie kategorie, BigDecimal steuersatz, String beschreibung) {
+            this(id, bezeichnung, menge, einheit, nettopreis, basismenge, kategorie, steuersatz, beschreibung, null);
+        }
 
         /** Ohne Beschreibung. */
         public Position(String id, String bezeichnung, BigDecimal menge, String einheit, BigDecimal nettopreis,
@@ -173,6 +205,56 @@ public record Rechnung(
         public Position {
             if (nettopreis.signum() < 0) {
                 throw new IllegalArgumentException("Nettopreis darf nicht negativ sein (BR-27): " + id);
+            }
+            if (rabatt != null && rabatt.signum() == 0) {
+                rabatt = null;
+            }
+            if (rabatt != null && (rabatt.signum() < 0 || rabatt.compareTo(BigDecimal.valueOf(100)) > 0)) {
+                throw new IllegalArgumentException("Rabatt muss zwischen 0 und 100 % liegen (BT-138): " + id);
+            }
+        }
+    }
+
+    /**
+     * BG-20 Abschlag (Rabatt) oder BG-21 Zuschlag auf die ganze Rechnung, entweder in Prozent der Positionssumme
+     * oder als fester Nettobetrag. Die Steuerkategorie gibt man nicht an: {@link Berechnung} verteilt den Betrag
+     * anteilig auf die Steuergruppen der Positionen, so wie eine Nebenleistung der Hauptleistung folgt.
+     *
+     * @param zuschlag {@code true} Zuschlag (BG-21), {@code false} Abschlag (BG-20)
+     * @param prozent  BT-94 / BT-101, nur ohne Betrag
+     * @param betrag   BT-92 / BT-99 als Nettobetrag, nur ohne Prozent
+     * @param grund    BT-97 / BT-104, optional (Vorgabe „Rabatt“ bzw. „Zuschlag“)
+     */
+    public record AbschlagZuschlag(boolean zuschlag, BigDecimal prozent, BigDecimal betrag, String grund) {
+
+        public AbschlagZuschlag {
+            if ((prozent == null) == (betrag == null)) {
+                throw new IllegalArgumentException(
+                        (zuschlag ? "Zuschlag" : "Rabatt") + ": Prozent oder Betrag angeben, nicht beides");
+            }
+            if ((prozent != null && prozent.signum() <= 0) || (betrag != null && betrag.signum() <= 0)) {
+                throw new IllegalArgumentException((zuschlag ? "Zuschlag" : "Rabatt") + " muss größer als 0 sein");
+            }
+            if (grund != null && grund.isBlank()) {
+                grund = null;
+            }
+        }
+
+        /** Text für BT-97 / BT-104 und das PDF. */
+        public String text() {
+            return grund != null ? grund.strip() : zuschlag ? "Zuschlag" : "Rabatt";
+        }
+    }
+
+    /**
+     * Skonto: bei Zahlung innerhalb von {@code tage} Tagen darf der Käufer {@code prozent} vom Zahlbetrag abziehen.
+     * Kodiert nach BR-DE-18 als {@code #SKONTO#TAGE=14#PROZENT=2.00#} in BT-20.
+     */
+    public record Skonto(int tage, BigDecimal prozent) {
+
+        public Skonto {
+            if (tage <= 0 || prozent.signum() <= 0 || prozent.compareTo(BigDecimal.valueOf(100)) >= 0) {
+                throw new IllegalArgumentException("Skonto braucht Tage über 0 und einen Satz zwischen 0 und 100 %");
             }
         }
     }

@@ -20,11 +20,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import openbilling.model.Berechnung;
 import openbilling.model.Rechnung;
+import openbilling.model.Rechnung.AbschlagZuschlag;
 import openbilling.model.Rechnung.Adresse;
 import openbilling.model.Rechnung.ElektronischeAdresse;
 import openbilling.model.Rechnung.Kontakt;
 import openbilling.model.Rechnung.Partei;
 import openbilling.model.Rechnung.Position;
+import openbilling.model.Rechnung.Skonto;
 import openbilling.model.Rechnung.Steuerkategorie;
 import openbilling.model.Rechnung.Zahlung;
 
@@ -78,6 +80,15 @@ public final class RechnungOds {
         "BT-10 Leitweg-ID / Käuferreferenz (Pflicht)",
         "BT-120 Grund der Steuerbefreiung (bei Kategorie ungleich S)",
         "BT-113 Bereits gezahlt",
+        "Rabatt, Zuschlag und Skonto auf die ganze Rechnung (optional)",
+        "BT-94 Rabatt in % der Positionssumme",
+        "BT-92 Rabatt als Nettobetrag (statt %)",
+        "BT-97 Grund des Rabatts (sonst „Rabatt“)",
+        "BT-101 Zuschlag in % der Positionssumme",
+        "BT-99 Zuschlag als Nettobetrag (statt %), z. B. Versand",
+        "BT-104 Grund des Zuschlags (sonst „Zuschlag“)",
+        "OB-3 Skonto: Tage ab Rechnungsdatum (wird nach BR-DE-18 in BT-20 geschrieben)",
+        "OB-4 Skonto: Prozent",
         "BT-22 Bemerkung (optional)",
         "OB-1 Schlussformel (optional, nur im PDF, nicht in der XRechnung)",
         "BT-24 Spezifikation (XRechnung-Version)",
@@ -118,6 +129,8 @@ public final class RechnungOds {
         "BT-86 BIC (optional)",
         "Berechnet von openbilling (wird nicht gelesen)",
         "BT-106 Summe Positionen",
+        "BT-107 Summe Rabatte",
+        "BT-108 Summe Zuschläge",
         "BT-109 Netto",
         "BT-110 Umsatzsteuer",
         "BT-112 Brutto",
@@ -134,19 +147,22 @@ public final class RechnungOds {
         "BT-151 Steuerkategorie (S, E, AE, …)",
         "BT-152 Steuersatz %",
         "BT-154 Beschreibung (optional)",
+        "BT-138 Rabatt % (optional)",
         "BT-131 Zeilenbetrag (berechnet)",
     };
 
     private static final java.util.Set<String> BERECHNET =
-            java.util.Set.of("BT-106", "BT-109", "BT-110", "BT-112", "BT-115", "BT-131");
+            java.util.Set.of("BT-106", "BT-107", "BT-108", "BT-109", "BT-110", "BT-112", "BT-115", "BT-131");
 
     /** Eingabespalten des Blatts Positionen, in dieser Reihenfolge stehen sie in {@link Entwurf#positionen}. */
     public static final List<String> POSITIONSFELDER =
-            List.of("BT-126", "BT-153", "BT-129", "BT-130", "BT-146", "BT-149", "BT-151", "BT-152", "BT-154");
+            List.of("BT-126", "BT-153", "BT-129", "BT-130", "BT-146", "BT-149", "BT-151", "BT-152", "BT-154",
+                    "BT-138");
 
     private static final java.util.Set<String> DATUMSFELDER = java.util.Set.of("BT-2", "BT-9", "BT-72", "BT-73", "BT-74");
     private static final java.util.Set<String> ZAHLENFELDER =
-            java.util.Set.of("BT-113", "BT-129", "BT-146", "BT-149", "BT-152");
+            java.util.Set.of("BT-113", "BT-129", "BT-146", "BT-149", "BT-152", "BT-138", "BT-92", "BT-94", "BT-99",
+                    "BT-101", "OB-3", "OB-4");
 
     /**
      * Rohe Eingaben als Text, auch unvollständig (Bedienoberfläche, Vorlagen).
@@ -220,18 +236,35 @@ public final class RechnungOds {
         w.put("BT-85", r.zahlung().kontoinhaber());
         w.put("BT-86", r.zahlung().bic());
 
+        // Der Datenvertrag kennt je einen Rabatt und einen Zuschlag auf die ganze Rechnung
+        List<AbschlagZuschlag> az = r.abschlaegeZuschlaege();
+        az.stream().filter(a -> !a.zuschlag()).findFirst().ifPresent(a -> {
+            w.put("BT-94", a.prozent());
+            w.put("BT-92", a.betrag());
+            w.put("BT-97", a.grund());
+        });
+        az.stream().filter(AbschlagZuschlag::zuschlag).findFirst().ifPresent(a -> {
+            w.put("BT-101", a.prozent());
+            w.put("BT-99", a.betrag());
+            w.put("BT-104", a.grund());
+        });
+        if (az.stream().filter(AbschlagZuschlag::zuschlag).count() > 1 || az.stream().filter(a -> !a.zuschlag()).count() > 1) {
+            throw new IllegalArgumentException("Die ODS fasst je einen Rabatt und einen Zuschlag auf die ganze Rechnung");
+        }
+        if (r.skonto() != null) {
+            w.put("OB-3", BigDecimal.valueOf(r.skonto().tage()));
+            w.put("OB-4", r.skonto().prozent());
+        }
+
         var e = Berechnung.berechne(r);
-        w.put("BT-106", e.summeZeilen());
-        w.put("BT-109", e.netto());
-        w.put("BT-110", e.steuer());
-        w.put("BT-112", e.brutto());
-        w.put("BT-115", e.zahlbar());
+        summen(w, e);
 
         List<Object[]> zeilen = new ArrayList<>();
         for (int i = 0; i < r.positionen().size(); i++) {
             Position p = r.positionen().get(i);
             zeilen.add(new Object[] {p.id(), p.bezeichnung(), p.menge(), p.einheit(), p.nettopreis(),
-                p.basismenge(), p.kategorie().name(), p.steuersatz(), p.beschreibung(), e.zeilenbetraege().get(i)});
+                p.basismenge(), p.kategorie().name(), p.steuersatz(), p.beschreibung(), p.rabatt(),
+                e.zeilenbetraege().get(i)});
         }
         speichere(w, zeilen, ziel);
     }
@@ -246,11 +279,7 @@ public final class RechnungOds {
         List<BigDecimal> betraege = List.of();
         try {
             var erg = Berechnung.berechne(rechnung(e));
-            w.put("BT-106", erg.summeZeilen());
-            w.put("BT-109", erg.netto());
-            w.put("BT-110", erg.steuer());
-            w.put("BT-112", erg.brutto());
-            w.put("BT-115", erg.zahlbar());
+            summen(w, erg);
             betraege = erg.zeilenbetraege();
         } catch (OdsFehler | IllegalArgumentException unvollstaendig) {
             // dann ohne Summen
@@ -258,13 +287,27 @@ public final class RechnungOds {
         List<Object[]> zeilen = new ArrayList<>();
         for (int i = 0; i < e.positionen().size(); i++) {
             Object[] z = new Object[POSITIONEN.length];
-            for (int c = 0; c < POSITIONSFELDER.size(); c++) {
-                z[c] = typisiert(POSITIONSFELDER.get(c), e.positionen().get(i)[c]);
+            String[] feld = e.positionen().get(i);
+            for (int c = 0; c < POSITIONSFELDER.size() && c < feld.length; c++) {
+                z[c] = typisiert(POSITIONSFELDER.get(c), feld[c]);
             }
             z[POSITIONSFELDER.size()] = betraege.size() == e.positionen().size() ? betraege.get(i) : null;
             zeilen.add(z);
         }
         speichere(w, zeilen, ziel);
+    }
+
+    /** Berechnete Felder, nur zur Anzeige in der ODS. */
+    private static void summen(Map<String, Object> w, Berechnung.Ergebnis e) {
+        w.put("BT-106", e.summeZeilen());
+        if (!e.belegposten().isEmpty()) {
+            w.put("BT-107", e.abschlaege());
+            w.put("BT-108", e.zuschlaege());
+        }
+        w.put("BT-109", e.netto());
+        w.put("BT-110", e.steuer());
+        w.put("BT-112", e.brutto());
+        w.put("BT-115", e.zahlbar());
     }
 
     private static Object typisiert(String k, String s) {
@@ -438,6 +481,11 @@ public final class RechnungOds {
             probleme.add(BLATT_DATEN + ", BT-74: Leistungszeitraum endet vor seinem Beginn (BR-29)");
         }
 
+        List<AbschlagZuschlag> az = new ArrayList<>();
+        abschlagZuschlag(f, false, "BT-94", "BT-92", "BT-97", az);
+        abschlagZuschlag(f, true, "BT-101", "BT-99", "BT-104", az);
+        Skonto skonto = skonto(f);
+
         List<Position> positionen = positionen(posZellen, probleme);
         if (positionen.isEmpty() && probleme.isEmpty()) {
             probleme.add(BLATT_POSITIONEN + ": keine Position eingetragen (BG-25)");
@@ -447,7 +495,41 @@ public final class RechnungOds {
         }
         return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faellig, referenz,
                 bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen,
-                bemerkung, von, bis, f.text("OB-1"), f.text("OB-2"));
+                bemerkung, von, bis, f.text("OB-1"), f.text("OB-2"), az, skonto);
+    }
+
+    /** Rabatt (BG-20) oder Zuschlag (BG-21) auf die ganze Rechnung: Prozent oder Betrag, nicht beides. */
+    private static void abschlagZuschlag(Felder f, boolean zuschlag, String prozent, String betrag, String grund,
+            List<AbschlagZuschlag> ziel) {
+        BigDecimal p = f.zahl(prozent, false);
+        BigDecimal b = f.zahl(betrag, false);
+        if (p == null && b == null) {
+            return;
+        }
+        try {
+            ziel.add(new AbschlagZuschlag(zuschlag, p, b, f.text(grund)));
+        } catch (IllegalArgumentException ex) {
+            f.probleme().add(f.ort() + (p != null ? prozent : betrag) + ": " + ex.getMessage());
+        }
+    }
+
+    /** OB-3 Tage und OB-4 Prozent, beide oder keines. */
+    private static Skonto skonto(Felder f) {
+        BigDecimal tage = f.zahl("OB-3", false);
+        BigDecimal prozent = f.zahl("OB-4", false);
+        if (tage == null && prozent == null) {
+            return null;
+        }
+        if (tage == null || prozent == null) {
+            f.probleme().add(f.ort() + (tage == null ? "OB-3" : "OB-4") + ": Skonto braucht Tage und Prozent");
+            return null;
+        }
+        try {
+            return new Skonto(tage.intValueExact(), prozent);
+        } catch (ArithmeticException | IllegalArgumentException ex) {
+            f.probleme().add(f.ort() + "OB-3: Skonto braucht ganze Tage über 0 und einen Satz zwischen 0 und 100 %");
+            return null;
+        }
     }
 
     private static Kontakt kontakt(Felder f, String name, String telefon, String email) {
@@ -529,9 +611,13 @@ public final class RechnungOds {
             if (preis != null && preis.signum() < 0) {
                 probleme.add(ort + "BT-146: Nettopreis darf nicht negativ sein (BR-27)");
             }
+            BigDecimal rabatt = f.zahl("BT-138", false);
+            if (rabatt != null && (rabatt.signum() < 0 || rabatt.compareTo(BigDecimal.valueOf(100)) > 0)) {
+                probleme.add(ort + "BT-138: Rabatt muss zwischen 0 und 100 % liegen");
+            }
             if (probleme.isEmpty()) {
                 liste.add(new Position(id != null ? id : String.valueOf(liste.size() + 1), bezeichnung, menge,
-                        einheit, preis, basis, kategorie, satz, f.text("BT-154")));
+                        einheit, preis, basis, kategorie, satz, f.text("BT-154"), rabatt));
             }
         }
         return liste;
@@ -582,7 +668,7 @@ public final class RechnungOds {
             if (s == null) {
                 return null;
             }
-            String norm = s.replace(" ", "").replace("€", "");
+            String norm = s.replace(" ", "").replace("€", "").replace("%", "");
             if (norm.contains(",")) { // deutsche Schreibweise: 1.234,50
                 norm = norm.replace(".", "").replace(',', '.');
             }

@@ -4,11 +4,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import openbilling.model.Rechnung;
+import openbilling.model.Rechnung.AbschlagZuschlag;
 import openbilling.model.Rechnung.Adresse;
 import openbilling.model.Rechnung.ElektronischeAdresse;
 import openbilling.model.Rechnung.Kontakt;
 import openbilling.model.Rechnung.Partei;
 import openbilling.model.Rechnung.Position;
+import openbilling.model.Rechnung.Skonto;
 import openbilling.model.Rechnung.Steuerkategorie;
 import openbilling.model.Rechnung.Zahlung;
 
@@ -63,6 +65,20 @@ public final class Testdaten {
                 r.faelligAm(), r.kaeuferReferenz(), r.zahlungsbedingungen(), r.lieferdatum(), r.verkaeufer(),
                 r.kaeufer(), r.zahlung(), r.befreiungsgrund(), r.vorausbezahlt(), r.positionen(), r.bemerkung(),
                 r.leistungVon(), r.leistungBis(), null, firmenname);
+    }
+
+    /**
+     * Zwei Steuersätze, 10 % Rabatt auf Position 1, 5 % Rabatt und 4,90 € Versand auf die ganze Rechnung,
+     * 2 % Skonto bei Zahlung in 10 Tagen. Erwartete Werte in {@code BerechnungTest.rabatteZuschlaegeUndSkonto}.
+     */
+    public static Rechnung rabattiert() {
+        return rechnung(List.of(
+                new Position("1", "Beratung", b("2"), "HUR", b("50.00"), null, Steuerkategorie.S, b("19"), null,
+                        b("10")),
+                pos("2", "1", "20.00", Steuerkategorie.S, "7"),
+                pos("3", "3", "33.33", Steuerkategorie.S, "19")))
+                .mit(List.of(new AbschlagZuschlag(false, b("5"), null, "Treuerabatt"),
+                        new AbschlagZuschlag(true, null, b("4.90"), "Versand")), new Skonto(10, b("2")));
     }
 
     public static Position pos(String id, String menge, String preis, Steuerkategorie k, String satz) {

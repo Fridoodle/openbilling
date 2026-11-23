@@ -73,7 +73,10 @@ final class Formular extends JPanel implements Scrollable {
 
     // Spalten des Tabellenmodells; BASIS (BT-149) wird nicht angezeigt, aber mitgeführt
     private static final int POS = 0, TEXT = 1, MENGE = 2, EINHEIT = 3, PREIS = 4, STEUER = 5, BETRAG_SPALTE = 6,
-            BASIS = 7, BESCHREIBUNG = 8;
+            BASIS = 7, BESCHREIBUNG = 8, RABATT = 9;
+
+    /** Zahlenfelder im Kopf, die wie die Positionen ohne Tausenderpunkte gespeichert werden. */
+    private static final Set<String> ZAHLEN = Set.of("BT-92", "BT-94", "BT-99", "BT-101", "OB-3", "OB-4");
 
     /**
      * Felder, ohne die keine gültige XRechnung entsteht: Pflicht im Rechnungsmodell (RechnungOds) oder für den
@@ -85,7 +88,8 @@ final class Formular extends JPanel implements Scrollable {
     private final Map<String, JTextComponent> felder = new LinkedHashMap<>();
     private final Map<String, String> namen = new HashMap<>();
     private final DefaultTableModel positionen = new DefaultTableModel(
-            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", "", ""}, 0) {
+            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", "", "",
+                "Rabatt %"}, 0) {
         @Override
         public boolean isCellEditable(int zeile, int spalte) {
             return spalte != BETRAG_SPALTE;
@@ -155,8 +159,35 @@ final class Formular extends JPanel implements Scrollable {
         zahlung.add(zeile(feld("BT-120", "Grund der Steuerbefreiung", "Zahlung"), 1));
         tipp("BT-120", "Nur nötig, wenn eine Position steuerfrei ist, z. B. Kleinunternehmer nach § 19 UStG.");
 
+        zahlung.add(Box.createVerticalStrut(18));
+        JPanel nachlass = abschnitt("Rabatt, Zuschlag und Skonto", null);
+        nachlass.add(zeile(feld("BT-94", "Rabatt %", "Rabatt"), 1, feld("BT-92", "oder Rabatt €", "Rabatt"), 1,
+                feld("BT-97", "Grund", "Rabatt"), 2));
+        nachlass.add(zeile(feld("BT-101", "Zuschlag %", "Zuschlag"), 1, feld("BT-99", "oder Zuschlag €", "Zuschlag"),
+                1, feld("BT-104", "Grund", "Zuschlag"), 2));
+        nachlass.add(zeile(feld("OB-3", "Skonto Tage", "Skonto"), 1,
+                feld("OB-4", "Skonto %", "Skonto"), 1, new JPanel(), 2));
+        felder.get("BT-97").putClientProperty("JTextField.placeholderText", "Rabatt");
+        felder.get("BT-104").putClientProperty("JTextField.placeholderText", "z. B. Versand");
+        tipp("BT-94", "Rabatt auf die ganze Rechnung in Prozent der Positionssumme. Bei mehreren Steuersätzen wird er"
+                + " auf jeden Satz angewendet.");
+        tipp("BT-92", "Rabatt als fester Nettobetrag statt Prozent. Bei mehreren Steuersätzen wird er anteilig"
+                + " verteilt.");
+        tipp("BT-101", "Zuschlag auf die ganze Rechnung in Prozent der Positionssumme, z. B. Eilzuschlag.");
+        tipp("BT-99", "Zuschlag als fester Nettobetrag, z. B. Versand oder Verpackung. Bei mehreren Steuersätzen"
+                + " wird er anteilig verteilt.");
+        tipp("OB-3", "Skonto: Zahlt der Kunde innerhalb dieser Tage ab Rechnungsdatum, darf er den Prozentsatz"
+                + " abziehen. Steht im PDF und maschinenlesbar in der XRechnung.");
+        for (JComponent teil : new JComponent[] {zahlung, nachlass}) {
+            teil.setAlignmentX(LEFT_ALIGNMENT);
+        }
+        JPanel links = new JPanel();
+        links.setLayout(new BoxLayout(links, BoxLayout.Y_AXIS));
+        links.add(zahlung);
+        links.add(nachlass);
+
         JPanel unten = new JPanel(new GridLayout(1, 2, 40, 0));
-        unten.add(zahlung);
+        unten.add(links);
         unten.add(summen());
 
         JPanel seite = new JPanel();
@@ -304,6 +335,11 @@ final class Formular extends JPanel implements Scrollable {
         for (int spalte : new int[] {MENGE, PREIS, BETRAG_SPALTE}) {
             tabelle.getColumnModel().getColumn(spalte).setCellRenderer(rechts);
         }
+        // Rabatt (BT-138) steht im Modell hinten, in der Ansicht vor dem Betrag
+        var rabatt = tabelle.getColumnModel().getColumn(tabelle.convertColumnIndexToView(RABATT));
+        rabatt.setPreferredWidth(80);
+        rabatt.setCellRenderer(rechts);
+        tabelle.moveColumn(tabelle.convertColumnIndexToView(RABATT), tabelle.convertColumnIndexToView(BETRAG_SPALTE));
         tabelle.getColumnModel().getColumn(EINHEIT).setCellEditor(auswahl(EINHEITEN, List.of()));
         tabelle.getColumnModel().getColumn(STEUER).setCellEditor(auswahl(STEUERN, List.of("19 %", "7 %", "0 %")));
         positionen.addTableModelListener(e -> {
@@ -332,7 +368,7 @@ final class Formular extends JPanel implements Scrollable {
         JButton neu = new JButton("Position hinzufügen");
         neu.addActionListener(e -> {
             positionen.addRow(new Object[] {String.valueOf(positionen.getRowCount() + 1), "", "1", "Stück", "",
-                "19 %", "", null, null});
+                "19 %", "", null, null, ""});
             int zeile = positionen.getRowCount() - 1;
             tabelle.changeSelection(zeile, TEXT, false, false);
             tabelle.editCellAt(zeile, TEXT);
@@ -448,7 +484,8 @@ final class Formular extends JPanel implements Scrollable {
         for (String[] z : e.positionen()) {
             BigDecimal preis = zahl(z[4]);
             positionen.addRow(new Object[] {z[0], z[1], z[2], einheit(z[3], 1, 0),
-                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5], z[8]});
+                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5], z[8],
+                z.length > 9 ? z[9] : null});
         }
         laedt = false;
         rechne();
@@ -465,7 +502,7 @@ final class Formular extends JPanel implements Scrollable {
             if (f.getText().isBlank()) {
                 d.remove(bt);
             } else {
-                d.put(bt, f.getText().strip());
+                d.put(bt, ZAHLEN.contains(bt) ? normal(f.getText().strip()) : f.getText().strip());
             }
         });
         // ohne eigene E-Rechnungs-Adresse gilt die E-Mail; das Schema folgt aus der Form der Adresse
@@ -483,7 +520,7 @@ final class Formular extends JPanel implements Scrollable {
             String[] st = steuer(wert(i, STEUER));
             zeilen.add(new String[] {wert(i, POS), wert(i, TEXT), normal(wert(i, MENGE)),
                 einheit(wert(i, EINHEIT), 0, 1), normal(wert(i, PREIS)), wert(i, BASIS), st[0], st[1],
-                wert(i, BESCHREIBUNG)});
+                wert(i, BESCHREIBUNG), normal(wert(i, RABATT))});
         }
         return new Entwurf(d, zeilen);
     }
@@ -563,7 +600,7 @@ final class Formular extends JPanel implements Scrollable {
             try {
                 if (menge != null && preis != null) {
                     ps.add(new Position("", "", menge, "", preis, zahl(wert(i, BASIS)),
-                            Steuerkategorie.valueOf(st[0]), zahl(st[1])));
+                            Steuerkategorie.valueOf(st[0]), zahl(st[1]), null, zahl(wert(i, RABATT))));
                     zeilen.add(i);
                 }
             } catch (RuntimeException unvollstaendig) {
@@ -582,7 +619,7 @@ final class Formular extends JPanel implements Scrollable {
             gesamt.setText("–");
         } else {
             var erg = Berechnung.berechne(new Rechnung(null, null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, ps));
+                    null, null, null, null, null, ps).mit(abschlaegeZuschlaege(), null));
             for (int i = 0; i < zeilen.size(); i++) {
                 positionen.setValueAt(BETRAG.format(erg.zeilenbetraege().get(i)), zeilen.get(i), BETRAG_SPALTE);
             }
@@ -593,6 +630,23 @@ final class Formular extends JPanel implements Scrollable {
         laedt = vorher;
     }
 
+    /** Rabatt und Zuschlag auf die ganze Rechnung, soweit schon gültig eingegeben; für die Summen im Formular. */
+    private List<Rechnung.AbschlagZuschlag> abschlaegeZuschlaege() {
+        List<Rechnung.AbschlagZuschlag> liste = new ArrayList<>();
+        for (String[] k : new String[][] {{"BT-94", "BT-92", "BT-97", ""}, {"BT-101", "BT-99", "BT-104", "z"}}) {
+            try {
+                BigDecimal p = zahl(felder.get(k[0]).getText());
+                BigDecimal b = zahl(felder.get(k[1]).getText());
+                if (p != null || b != null) {
+                    liste.add(new Rechnung.AbschlagZuschlag(!k[3].isEmpty(), p, b, null));
+                }
+            } catch (IllegalArgumentException unvollstaendig) {
+                // zählt erst, wenn die Eingabe stimmt; die Prüfung meldet den Fehler
+            }
+        }
+        return liste;
+    }
+
     // ------------------------------------------------------------ Umrechnung Anzeige ↔ Datei
 
     /** Deutsche Zahl: {@code 3.000,50}, {@code 3000,5}, {@code 3.000}; ein einzelner Punkt gilt als Komma. */
@@ -600,7 +654,7 @@ final class Formular extends JPanel implements Scrollable {
         if (s == null || s.isBlank()) {
             return null;
         }
-        s = s.replace(" ", "").replace("€", "");
+        s = s.replace(" ", "").replace("€", "").replace("%", "");
         if (s.contains(",") || s.matches("\\d{1,3}(\\.\\d{3})+")) {
             s = s.replace(".", "").replace(',', '.');
         }

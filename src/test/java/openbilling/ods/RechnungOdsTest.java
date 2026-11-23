@@ -163,6 +163,38 @@ class RechnungOdsTest {
     }
 
     @Test
+    void rabatteZuschlaegeUndSkontoUeberstehenOds() throws Exception {
+        Path datei = tmp.resolve("rabatt.ods");
+        Rechnung r = Testdaten.rabattiert();
+        RechnungOds.schreibe(r, datei);
+        Rechnung gelesen = RechnungOds.lese(datei);
+        assertEquals(r.abschlaegeZuschlaege().size(), gelesen.abschlaegeZuschlaege().size());
+        assertEquals(0, gelesen.positionen().get(0).rabatt().compareTo(new BigDecimal("10")));
+        assertEquals(r.skonto().tage(), gelesen.skonto().tage());
+        assertEquals("Versand", gelesen.abschlaegeZuschlaege().get(1).grund());
+        assertGleicheSummen(r, gelesen);
+        assertEquals(CiiSchreiber.zahlungsbedingungen(r), CiiSchreiber.zahlungsbedingungen(gelesen));
+        assertEquals(Berechnung.berechne(r).belegposten().stream().map(p -> p.betrag()).toList(),
+                Berechnung.berechne(gelesen).belegposten().stream().map(p -> p.betrag()).toList());
+
+        // über den Entwurf (Bedienoberfläche) ebenso
+        Path kopie = tmp.resolve("rabatt-entwurf.ods");
+        RechnungOds.schreibe(RechnungOds.leseEntwurf(datei), kopie);
+        assertGleicheSummen(r, RechnungOds.lese(kopie));
+    }
+
+    @Test
+    void rabattMitProzentUndBetragZugleichIstEinFehler() throws Exception {
+        var e = RechnungOds.leseEntwurf(FIXTURE);
+        e.daten().put("BT-94", "5");
+        e.daten().put("BT-92", "10,00");
+        e.daten().put("OB-3", "14");
+        var f = assertThrows(OdsFehler.class, () -> RechnungOds.rechnung(e));
+        assertTrue(f.probleme().stream().anyMatch(p -> p.contains("BT-94")), f::getMessage);
+        assertTrue(f.probleme().stream().anyMatch(p -> p.contains("OB-4")), f::getMessage);
+    }
+
+    @Test
     void kennungAusBeschriftung() {
         assertEquals("BT-34-1", RechnungOds.kennung("BT-34-1 Schema"));
         assertEquals("BT-1", RechnungOds.kennung("  BT-1 Rechnungsnummer"));
