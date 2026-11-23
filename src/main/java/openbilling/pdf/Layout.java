@@ -145,6 +145,11 @@ final class Layout {
                         .append("</fo:block>\n");
             }
         }
+        if (!leer(r.schlussformel())) {
+            s.append("<fo:block space-before=\"10mm\" linefeed-treatment=\"preserve\"")
+                    .append(" keep-together.within-page=\"always\">").append(x(r.schlussformel().strip()))
+                    .append("</fo:block>\n");
+        }
         return s.append("</fo:flow></fo:page-sequence></fo:root>\n").toString();
     }
 

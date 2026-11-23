@@ -144,11 +144,22 @@ class RechnungOdsTest {
     }
 
     @Test
+    void schlussformelUeberstehtOdsUndFehltInDerXml() throws Exception {
+        Path datei = tmp.resolve("schluss.ods");
+        String gruss = "Vielen Dank für die gute Zusammenarbeit.\nMit freundlichen Grüßen\nMax Mustermann";
+        RechnungOds.schreibe(Testdaten.mitSchlussformel(gruss), datei);
+        assertEquals(gruss, RechnungOds.lese(datei).schlussformel());
+        assertEquals(gruss, RechnungOds.leseEntwurf(datei).daten().get("OB-1"));
+        assertTrue(!CiiSchreiber.schreibe(RechnungOds.lese(datei)).contains("Zusammenarbeit"));
+    }
+
+    @Test
     void kennungAusBeschriftung() {
         assertEquals("BT-34-1", RechnungOds.kennung("BT-34-1 Schema"));
         assertEquals("BT-1", RechnungOds.kennung("  BT-1 Rechnungsnummer"));
         assertNull(RechnungOds.kennung("Verkäufer"));
         assertNull(RechnungOds.kennung("BT-12a"));
+        assertEquals("OB-1", RechnungOds.kennung("OB-1 Schlussformel"));
     }
 
     @Test

@@ -117,6 +117,9 @@ final class Formular extends JPanel implements Scrollable {
                 new JPanel(), 2));
         kopf.add(zeile(feld("BT-20", "Zahlungsbedingungen", "Rechnung"), 1));
         kopf.add(zeile(feld("BT-22", "Bemerkung, z. B. Einleitung oder Bauvorhaben", "Rechnung"), 1));
+        kopf.add(zeile(feld("OB-1", "Schlussformel, z. B. Dank und Grüße", "Rechnung"), 1));
+        tipp("OB-1", "Steht unten im PDF, nicht in der XRechnung. In einer Vorlage gespeichert, gilt sie für jede"
+                + " neue Rechnung.");
         tipp("BT-72", "Tag der Lieferung oder Leistung. Bei einem Zeitraum stattdessen von und bis ausfüllen.");
         tipp("BT-10", "Pflichtangabe. Bei Behörden die Leitweg-ID, sonst z. B. Bestell- oder Kundennummer.");
 
@@ -210,7 +213,7 @@ final class Formular extends JPanel implements Scrollable {
 
     /** Beschriftetes Eingabefeld, unter seiner BT-Kennung registriert. */
     private JComponent feld(String bt, String beschriftung, String gruppe) {
-        JTextComponent f = bt.equals("BT-22") ? mehrzeilig(new JTextArea(3, 4))
+        JTextComponent f = Set.of("BT-22", "OB-1").contains(bt) ? mehrzeilig(new JTextArea(3, 4))
                 : Set.of("BT-2", "BT-9", "BT-72", "BT-73", "BT-74").contains(bt) ? new DatumFeld()
                 : new JTextField(4);
         f.getDocument().addDocumentListener(new DocumentListener() {

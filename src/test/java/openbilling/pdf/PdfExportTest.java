@@ -61,6 +61,17 @@ class PdfExportTest {
     }
 
     @Test
+    void schlussformelStehtUntenImPdf() throws Exception {
+        var r = Testdaten.mitSchlussformel("Vielen Dank für die gute Zusammenarbeit.\nMit freundlichen Grüßen\n"
+                + "Max Mustermann");
+        try (var doc = Loader.loadPDF(PdfExport.sicht(r))) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.contains("Mit freundlichen Grüßen\nMax Mustermann"), text);
+            assertTrue(text.indexOf("Max Mustermann") > text.indexOf("Zahlbar innerhalb"), text);
+        }
+    }
+
+    @Test
     void vielePositionenPassenDurchKleinereSchriftAufEineSeite() throws Exception {
         var r = Testdaten.rechnung(IntStream.rangeClosed(1, 32)
                 .mapToObj(i -> Testdaten.pos(String.valueOf(i), "1", "10.00", Steuerkategorie.S, "19")).toList());

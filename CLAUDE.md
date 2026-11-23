@@ -20,7 +20,7 @@ Datenfluss (Zielbild):
 
 Die Bedienoberfläche (`openbilling.gui`, Swing mit FlatLaf) arbeitet auf `RechnungOds.Entwurf`, also auf denselben BT-Feldern wie die ODS, und nutzt Vorlagen (`vorlagen\*.ods`) und das Adressbuch (`kunden.ods`) aus dem Benutzerordner.
 
-Das Rechnungsmodell (`openbilling.model`) ist die zentrale Schicht: ODS-Parser (`openbilling.ods`) und XML-/PDF-Generatoren (`openbilling.xml`) hängen nur daran, nicht direkt aneinander. Das Blattlayout der ODS ist ein **Datenvertrag** (Blätter `Daten`/`Positionen`, Felder über BT-Kennungen, Details in `knowledge/decisions.md`). Er steht vollständig in `RechnungOds`. Wer ihn ändert, hält `tests/fixtures/minimal.ods` lesbar oder dokumentiert den Bruch.
+Das Rechnungsmodell (`openbilling.model`) ist die zentrale Schicht: ODS-Parser (`openbilling.ods`) und XML-/PDF-Generatoren (`openbilling.xml`) hängen nur daran, nicht direkt aneinander. Das Blattlayout der ODS ist ein **Datenvertrag** (Blätter `Daten`/`Positionen`, Felder über BT-Kennungen, Zusatzfelder ohne BT als `OB-n`, Details in `knowledge/decisions.md`). Er steht vollständig in `RechnungOds`. Wer ihn ändert, hält `tests/fixtures/minimal.ods` lesbar oder dokumentiert den Bruch.
 
 ## Stack und Leitlinie: Java 21, leichtgewichtig, minimalistisch
 

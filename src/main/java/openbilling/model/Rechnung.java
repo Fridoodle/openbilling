@@ -28,6 +28,8 @@ import java.util.List;
  * @param bemerkung       BT-22 Freitext zur Rechnung (z. B. Einleitung, Bauvorhaben), optional
  * @param leistungVon     BT-73 Beginn des Leistungszeitraums (BG-14), optional
  * @param leistungBis     BT-74 Ende des Leistungszeitraums (BG-14), optional
+ * @param schlussformel   kein BT: Grußformel am Ende der Sichtkopie (z. B. Dank und Unterschrift), nur im PDF,
+ *                        nicht in der XRechnung, optional, darf mehrzeilig sein
  */
 public record Rechnung(
         String spezifikation,
@@ -48,7 +50,19 @@ public record Rechnung(
         List<Position> positionen,
         String bemerkung,
         LocalDate leistungVon,
-        LocalDate leistungBis) {
+        LocalDate leistungBis,
+        String schlussformel) {
+
+    /** Ohne Schlussformel. */
+    public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
+            String waehrung, LocalDate faelligAm, String kaeuferReferenz, String zahlungsbedingungen,
+            LocalDate lieferdatum, Partei verkaeufer, Partei kaeufer, Zahlung zahlung, String befreiungsgrund,
+            BigDecimal vorausbezahlt, List<Position> positionen, String bemerkung, LocalDate leistungVon,
+            LocalDate leistungBis) {
+        this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, bemerkung, leistungVon, leistungBis, null);
+    }
 
     /** Ohne Bemerkung und Leistungszeitraum. */
     public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
@@ -57,7 +71,7 @@ public record Rechnung(
             BigDecimal vorausbezahlt, List<Position> positionen) {
         this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
                 zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
-                positionen, null, null, null);
+                positionen, null, null, null, null);
     }
 
     public Rechnung {

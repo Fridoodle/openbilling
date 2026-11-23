@@ -35,6 +35,8 @@ import openbilling.model.Rechnung.Zahlung;
  *   <li>Blatt {@code Daten}: Spalte A Feld, Spalte B Wert. Ein Feld beginnt mit seiner BT-Kennung
  *       ({@code BT-1 Rechnungsnummer}); nur die Kennung zählt, Reihenfolge und Beschriftung sind frei.
  *       Zeilen ohne BT-Kennung (Überschriften) und berechnete Felder werden beim Lesen ignoriert.
+ *       Felder, die es in der EN 16931 nicht gibt (nur für die Sichtkopie), haben eine eigene Kennung
+ *       {@code OB-n} (openbilling) und werden wie BT-Felder behandelt.
  *   <li>Blatt {@code Positionen}: Zeile 1 enthält Spaltenköpfe mit BT-Kennung, darunter eine Zeile je Position.
  *       Leere Zeilen werden übersprungen.
  *   <li>Weitere Blätter (z. B. {@code Ansicht}) werden nicht gelesen.
@@ -77,6 +79,7 @@ public final class RechnungOds {
         "BT-120 Grund der Steuerbefreiung (bei Kategorie ungleich S)",
         "BT-113 Bereits gezahlt",
         "BT-22 Bemerkung (optional)",
+        "OB-1 Schlussformel (optional, nur im PDF, nicht in der XRechnung)",
         "BT-24 Spezifikation (XRechnung-Version)",
         "BT-23 Geschäftsprozess (optional)",
         "Verkäufer",
@@ -152,7 +155,7 @@ public final class RechnungOds {
      */
     public record Entwurf(Map<String, String> daten, List<String[]> positionen) {}
 
-    private static final Pattern KENNUNG = Pattern.compile("^\\s*(BT-\\d+(?:-\\d+)?)\\b");
+    private static final Pattern KENNUNG = Pattern.compile("^\\s*((?:BT|OB)-\\d+(?:-\\d+)?)\\b");
     private static final DateTimeFormatter DATUM_DE = DateTimeFormatter.ofPattern("d.M.uuuu");
 
     private RechnungOds() {}
@@ -196,6 +199,7 @@ public final class RechnungOds {
         w.put("BT-73", r.leistungVon());
         w.put("BT-74", r.leistungBis());
         w.put("BT-22", r.bemerkung());
+        w.put("OB-1", r.schlussformel());
         w.put("BT-9", r.faelligAm());
         w.put("BT-20", r.zahlungsbedingungen());
         w.put("BT-10", r.kaeuferReferenz());
@@ -441,7 +445,7 @@ public final class RechnungOds {
         }
         return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faellig, referenz,
                 bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen,
-                bemerkung, von, bis);
+                bemerkung, von, bis, f.text("OB-1"));
     }
 
     private static Kontakt kontakt(Felder f, String name, String telefon, String email) {
@@ -531,7 +535,7 @@ public final class RechnungOds {
         return liste;
     }
 
-    /** BT-Kennung am Anfang einer Beschriftung, sonst {@code null}. */
+    /** BT- oder OB-Kennung am Anfang einer Beschriftung, sonst {@code null}. */
     static String kennung(String beschriftung) {
         Matcher m = KENNUNG.matcher(beschriftung);
         return m.find() ? m.group(1) : null;
