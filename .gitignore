@@ -1,7 +1,7 @@
 # Claude local overrides
 .claude/settings.local.json
 
-# Rust
+# Maven
 /target/
 
 # Lokale Tools (per scripts/setup-validator.ps1)

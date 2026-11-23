@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.fridoodle</groupId>
+  <artifactId>openbilling</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>openbilling</name>
+  <description>E-Rechnungen nach XRechnung aus OpenDocument-Tabellen</description>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <mustang.version>2.26.0</mustang.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>6.1.3</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- CII/XRechnung, PDF/A-3, Factur-X-Einbettung (siehe knowledge/decisions.md) -->
+    <dependency>
+      <groupId>org.mustangproject</groupId>
+      <artifactId>library</artifactId>
+      <version>${mustang.version}</version>
+    </dependency>
+
+    <!-- offizielle XRechnung-Prüfung vor dem Export (siehe knowledge/decisions.md) -->
+    <dependency>
+      <groupId>org.kosit</groupId>
+      <artifactId>validator</artifactId>
+      <version>1.6.3</version>
+    </dependency>
+    <!-- vom KoSIT-Validator als optional deklariert, zur Laufzeit aber nötig (lessons-learned.md);
+         Version wie im Validator-POM (version.jaxb-impl) -->
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <version>4.0.8</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- ODS lesen/schreiben, keine Laufzeitabhängigkeiten (siehe knowledge/decisions.md) -->
+    <dependency>
+      <groupId>com.github.miachm.sods</groupId>
+      <artifactId>SODS</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+
+    <!-- nur Tests: prüft PDF/A-3 (veraPDF) und eingebettete XML -->
+    <dependency>
+      <groupId>org.mustangproject</groupId>
+      <artifactId>validator</artifactId>
+      <version>${mustang.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>openbilling</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+      </plugin>
+      <!-- java -jar target/openbilling.jar: Abhängigkeiten liegen daneben in target/lib -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>openbilling.Main</mainClass>
+              <addClasspath>true</addClasspath>
+              <classpathPrefix>lib/</classpathPrefix>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>lib</id>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
