@@ -23,7 +23,9 @@ import openbilling.model.Rechnung;
 import openbilling.model.Rechnung.AbschlagZuschlag;
 import openbilling.model.Rechnung.Adresse;
 import openbilling.model.Rechnung.ElektronischeAdresse;
+import openbilling.model.Rechnung.Karte;
 import openbilling.model.Rechnung.Kontakt;
+import openbilling.model.Rechnung.Lastschrift;
 import openbilling.model.Rechnung.Partei;
 import openbilling.model.Rechnung.Position;
 import openbilling.model.Rechnung.Skonto;
@@ -122,11 +124,20 @@ public final class RechnungOds {
         "BT-49-1 Schema der elektronischen Adresse (EM = E-Mail, 0204 = Leitweg-ID)",
         "BT-48 USt-IdNr. (optional)",
         "Zahlung",
-        "BT-81 Zahlungsart (58 SEPA-Überweisung)",
+        "BT-81 Zahlungsart (58 SEPA-Überweisung, 59 SEPA-Lastschrift, 54 Kreditkarte, 55 Debitkarte, 10 bar, 68 online)",
         "BT-83 Verwendungszweck",
+        "BT-82 Bei anderen Zahlungsarten: Bezeichnung (optional, z. B. PayPal)",
+        "Bei Überweisung (58)",
         "BT-84 IBAN",
         "BT-85 Kontoinhaber",
         "BT-86 BIC (optional)",
+        "Bei SEPA-Lastschrift (59)",
+        "BT-90 Gläubiger-Identifikationsnummer",
+        "BT-89 Mandatsreferenz",
+        "BT-91 IBAN des Kunden (wird belastet)",
+        "Bei Kartenzahlung (48, 54, 55)",
+        "BT-87 Kartennummer, nur die letzten 4 bis 6 Ziffern",
+        "BT-88 Karteninhaber (optional)",
         "Berechnet von openbilling (wird nicht gelesen)",
         "BT-106 Summe Positionen",
         "BT-107 Summe Rabatte",
@@ -235,6 +246,16 @@ public final class RechnungOds {
         w.put("BT-84", r.zahlung().iban());
         w.put("BT-85", r.zahlung().kontoinhaber());
         w.put("BT-86", r.zahlung().bic());
+        w.put("BT-82", r.zahlung().text());
+        if (r.zahlung().lastschrift() != null) {
+            w.put("BT-89", r.zahlung().lastschrift().mandat());
+            w.put("BT-90", r.zahlung().lastschrift().glaeubigerId());
+            w.put("BT-91", r.zahlung().lastschrift().iban());
+        }
+        if (r.zahlung().karte() != null) {
+            w.put("BT-87", r.zahlung().karte().nummer());
+            w.put("BT-88", r.zahlung().karte().inhaber());
+        }
 
         // Der Datenvertrag kennt je einen Rabatt und einen Zuschlag auf die ganze Rechnung
         List<AbschlagZuschlag> az = r.abschlaegeZuschlaege();
@@ -460,8 +481,7 @@ public final class RechnungOds {
                 kontakt(f, "BT-56", "BT-57", "BT-58"),
                 new ElektronischeAdresse(f.pflicht("BT-49-1"), f.pflicht("BT-49")),
                 f.text("BT-48"), null);
-        var zahlung = new Zahlung(f.pflicht("BT-81"), f.text("BT-83"), f.pflicht("BT-84"),
-                f.text("BT-85"), f.text("BT-86"));
+        var zahlung = zahlung(f);
         String nummer = f.pflicht("BT-1");
         LocalDate datum = f.datum("BT-2", true);
         String typ = f.pflicht("BT-3");
@@ -496,6 +516,33 @@ public final class RechnungOds {
         return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faellig, referenz,
                 bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen,
                 bemerkung, von, bis, f.text("OB-1"), f.text("OB-2"), az, skonto);
+    }
+
+    /**
+     * BG-16 nach Zahlungsart. Gelesen werden nur die Felder, die zur Art gehören, denn BR-DE-23/24/25 verbieten
+     * die übrigen Gruppen. So darf eine Vorlage z. B. die Gläubiger-ID behalten, auch wenn diesmal überwiesen wird.
+     */
+    private static Zahlung zahlung(Felder f) {
+        String art = f.pflicht("BT-81");
+        var z = new Zahlung(art, null, null, null, null);
+        String zweck = f.text("BT-83");
+        if (z.istUeberweisung()) {
+            return new Zahlung(art, zweck, f.pflicht("BT-84"), f.text("BT-85"), f.text("BT-86"), null, null, null);
+        }
+        if (z.istLastschrift()) {
+            var l = new Lastschrift(f.pflicht("BT-89"), f.pflicht("BT-90"), f.pflicht("BT-91"));
+            return new Zahlung(art, zweck, null, null, null, null, l, null);
+        }
+        if (z.istKarte()) {
+            String nummer = f.pflicht("BT-87");
+            nummer = nummer == null ? null : nummer.replace(" ", "");
+            if (nummer != null && !nummer.matches("\\d{4,6}")) {
+                f.probleme().add(f.ort() + "BT-87: nur die letzten 4 bis 6 Ziffern der Karte angeben, nie die ganze"
+                        + " Kartennummer (BR-51)");
+            }
+            return new Zahlung(art, zweck, null, null, null, null, null, new Karte(nummer, f.text("BT-88")));
+        }
+        return new Zahlung(art, zweck, null, null, null, f.text("BT-82"), null, null);
     }
 
     /** Rabatt (BG-20) oder Zuschlag (BG-21) auf die ganze Rechnung: Prozent oder Betrag, nicht beides. */
