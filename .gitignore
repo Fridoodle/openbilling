@@ -4,6 +4,9 @@
 # Rust
 /target/
 
+# Lokale Tools (per scripts/setup-validator.ps1)
+/tools/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -14,6 +14,12 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Entscheidung:** Implementierung in Rust. Jede neue Abhängigkeit braucht eine Begründung und wird hier eingetragen.
 - **Konsequenzen:** Das Rust-Ökosystem für PDF/A-3 und Factur-X ist dünner als bei Java oder Python. Für die Einbettung ist vermutlich eigene, schlanke Logik auf einer PDF-Crate nötig (unverifiziert, vor Umsetzung prüfen). Den ODS→PDF-Schritt kann LibreOffice im Headless-Modus übernehmen; das ist dann eine externe Laufzeitabhängigkeit.
 
+## 2026-11-23 — Formatprüfung mit dem offiziellen KoSIT-Validator
+
+- **Kontext:** Erzeugte XRechnungen müssen nachweislich gültig sein.
+- **Entscheidung:** Geprüft wird mit dem offiziellen KoSIT-Validator plus der XRechnung-Konfiguration, mit festgelegten Versionen in `scripts/setup-validator.ps1`. Er läuft nur als Entwicklungs- und Testwerkzeug, nicht im ausgelieferten Rust-Binary. Eine eigene Validierungslogik wird nicht nachgebaut.
+- **Konsequenzen:** Wer entwickelt, braucht Java 11+. Rust-Tests können den Validator später als Integrationstest aufrufen (`java -jar …`, stdin auf eine leere Datei umgeleitet, siehe `lessons-learned.md`).
+
 ## Offen
 
 - Libraries für ODS, XML und PDF; Bedienoberfläche (CLI, Desktop oder Web)

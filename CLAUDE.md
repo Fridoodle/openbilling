@@ -50,7 +50,17 @@ Kernpunkte (Stand 2026-11, Details und Quellen in der Datei):
 - Primäre Syntax ist **UN/CEFACT CII**, denn nur CII lässt sich als Factur-X/ZUGFeRD (Profil XRECHNUNG) ins PDF einbetten. UBL bleibt ein optionaler Zusatzexport.
 - Punkte mit `(unverifiziert)` erst gegen die Primärquelle prüfen, bevor du darauf aufbaust.
 
-Jede erzeugte XML muss den **KoSIT-Validator** bestehen (Java 11+). Ein Feature gilt erst als fertig, wenn das der Fall ist.
+Jede erzeugte XML muss den **KoSIT-Validator** bestehen. Ein Feature gilt erst als fertig, wenn das der Fall ist.
+
+```powershell
+.\scripts\setup-validator.ps1                              # einmalig: Validator + XRechnung-Konfiguration nach tools/kosit/ (gitignored)
+.\scripts\validate.ps1 rechnung.xml [weitere.xml ...]      # Prüfen; Exit 0 = gültig, Berichte (HTML/XML) in out/validation/
+.\scripts\validate.ps1 tests\fixtures\minimal-ubl.xml tests\fixtures\minimal-cii.xml   # Referenzbeispiele, müssen ACCEPTABLE sein
+```
+
+Voraussetzung ist Java 11+ (Entwicklungswerkzeug, nicht Teil des Programms): `winget install EclipseAdoptium.Temurin.21.JRE`. Die Versionen von Validator und Konfiguration sind in `scripts/setup-validator.ps1` festgelegt. Bei einem neuen KoSIT-Release dort anheben und die Fixtures erneut prüfen.
+
+Abgelehnte Dateien zeigen die Regel-ID (z. B. `BR-DE-15`) in der Tabelle. Details stehen im HTML-Bericht unter `out/validation/`.
 
 ## Knowledge Base pflegen (Pflicht für alle Agenten)
 

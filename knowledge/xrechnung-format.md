@@ -270,6 +270,8 @@ java -jar validator-1.6.3-standalone.jar -s xrcfg/scenarios.xml -r xrcfg -h rech
 # Ergebnis: rechnung-report.xml (+ rechnung-report.html)
 ```
 
+Im Repo kapseln `scripts/setup-validator.ps1` und `scripts/validate.ps1` diese Schritte. Die Option `-o <ordner>` funktioniert (geprüft mit 1.6.3). Zu Windows-Stolperfallen siehe `lessons-learned.md`.
+
 | Option | Bedeutung |
 |---|---|
 | `-s <scenarios.xml>` | Szenario-Konfiguration (mehrfach möglich, auch `NAME=pfad`) |
@@ -350,7 +352,7 @@ Testdaten: `xrechnung-testsuite` (Mirror auf GitHub, Original auf projekte.kosit
 
 ## 9. Minimalbeispiele (B2G, 1 Position, 19 % USt)
 
-Rechnung: 10 h × 85,00 € = 850,00 € netto, 19 % USt = 161,50 €, brutto 1.011,50 €. Die Beispiele sind von Hand nach den XRechnung-Regeln und der Testsuite-Datei `01.01a` erstellt, **aber noch nicht mit dem KoSIT-Validator geprüft** (lokal war kein Java vorhanden). Vor der Nutzung als Testfixture deshalb validieren. IBAN (`DE02120300000000202051`) und Leitweg-ID (`04011000-12345-03`) sind prüfziffernkorrekt.
+Rechnung: 10 h × 85,00 € = 850,00 € netto, 19 % USt = 161,50 €, brutto 1.011,50 €. Die Beispiele sind von Hand nach den XRechnung-Regeln und der Testsuite-Datei `01.01a` erstellt, Am 23.11.2026 mit KoSIT-Validator 1.6.3 und der Konfiguration XRechnung 3.0.2 (2026-08-31) geprüft: beide **ACCEPTABLE**. Sie liegen als `tests/fixtures/minimal-ubl.xml` und `tests/fixtures/minimal-cii.xml` im Repo. IBAN (`DE02120300000000202051`) und Leitweg-ID (`04011000-12345-03`) sind prüfziffernkorrekt.
 
 ### 9.1 UBL 2.1
 
