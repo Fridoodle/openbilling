@@ -6,9 +6,9 @@ E-Rechnungen nach **XRechnung** erstellen, ohne Abo und ohne Cloud. openbilling 
 - **Export als Hybrid-PDF:** Eine lesbare Rechnung auf einer Seite (PDF/A-3) mit der XRechnung-XML (UN/CEFACT CII, XRechnung 3.0) als Anhang.
 - **Geprüft vor dem Versand:** Exportiert wird nur, was der KoSIT-Validator akzeptiert. Fehler zeigt das Programm mit Regel-ID (z. B. `BR-DE-15`).
 - **Vorlagen und Adressbuch:** Eigene Daten einmal in eine Vorlage eintragen, Kunden im Adressbuch speichern.
-- **Fenster und Kommandozeile:** Hell- und Dunkelmodus, dazu eine CLI für Skripte.
+- **Fenster und Kommandozeile:** Hell- und Dunkelmodus, einstellbare Schriftgröße, dazu eine CLI für Skripte.
 
-> **Stand:** Version 0.1, frühe Phase. Unterstützt sind Rechnungen mit Überweisung, Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Lastschrift fehlt noch. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
+> **Stand:** Version 1.0. Unterstützt sind Rechnungen mit Überweisung, Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Lastschrift fehlt noch. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
 
 ## Installation (Windows)
 
@@ -30,7 +30,7 @@ Die Programmdateien sind noch nicht digital signiert. Windows SmartScreen zeigt 
 Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen Datei mit der zugehörigen `.sha256` im Release:
 
 ```powershell
-Get-FileHash openbilling-0.1.3-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash openbilling-1.0.0-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm. Bitte melde es als [Issue](https://github.com/Fridoodle/openbilling/issues) mit dem Namen des Scanners.
@@ -45,6 +45,8 @@ Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm.
 2. Neue Rechnung aus der Vorlage erstellen, Kunde und Positionen eintragen. Pflichtfelder sind mit `*` markiert. Die Rechnungsnummer schlägt openbilling vor: die zuletzt exportierte plus eins, im neuen Jahr wieder ab 1.
    Rabatt auf eine Position gibst du in der Spalte **Rabatt %** ein. Rabatt und Zuschlag auf die ganze Rechnung (in Prozent oder als Betrag, z. B. Versand) sowie Skonto stehen unter **Rabatt, Zuschlag und Skonto**. Bei mehreren Steuersätzen verteilt openbilling Rabatt und Zuschlag anteilig.
 3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als PDF mit XRechnung exportieren** (Strg+E) prüft und schreibt das Hybrid-PDF.
+
+**Schrift zu klein?** Unter **Ansicht → Schriftgröße** lässt sich die ganze Oberfläche auf 110 bis 200 % vergrößern, auch mit Strg + und Strg − (Strg 0 setzt zurück). openbilling merkt sich die Größe.
 
 Auch mitten in einer Rechnung geht **Datei → Neu aus Vorlage** (neue Rechnung aus einer Vorlage) und **Datei → Vorlage bearbeiten** (die Vorlage selbst öffnen; Speichern ändert dann die Vorlage). Ungespeicherte Änderungen fragt openbilling vorher ab.
 
