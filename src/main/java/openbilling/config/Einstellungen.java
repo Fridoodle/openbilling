@@ -84,9 +84,30 @@ public final class Einstellungen {
         }
     }
 
-    /** Vorgabe {@code tools/kosit/config} (relativ zum Arbeitsverzeichnis, per setup-validator.ps1). */
+    /**
+     * Einstellung {@code kosit.konfiguration}, sonst {@code tools/kosit/config} im Arbeitsverzeichnis
+     * (Entwicklung, per setup-validator.ps1), sonst {@code kosit/config} neben {@code openbilling.jar}
+     * (ausgeliefertes Paket, siehe scripts/package.ps1).
+     */
     public Path kositKonfiguration() {
-        return Path.of(werte.getProperty(KOSIT, "tools/kosit/config"));
+        String gesetzt = werte.getProperty(KOSIT);
+        if (gesetzt != null && !gesetzt.isBlank()) {
+            return Path.of(gesetzt);
+        }
+        Path entwicklung = Path.of("tools/kosit/config");
+        if (Files.exists(entwicklung.resolve("scenarios.xml"))) {
+            return entwicklung;
+        }
+        try {
+            Path jar = Path.of(Einstellungen.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            Path mitgeliefert = jar.resolveSibling("kosit").resolve("config");
+            if (Files.exists(mitgeliefert.resolve("scenarios.xml"))) {
+                return mitgeliefert;
+            }
+        } catch (Exception e) {
+            // kein JAR-Pfad ermittelbar: bei der Vorgabe bleiben
+        }
+        return entwicklung;
     }
 
     public String spezifikation() {
