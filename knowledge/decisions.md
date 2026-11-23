@@ -8,11 +8,35 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Entscheidung:** Quelle der Wahrheit ist eine OpenDocument-Tabelle (`.ods`). Export erzeugt ein PDF (Ziel: PDF/A-3), in das die XRechnung-XML als Anhang eingebettet ist.
 - **Konsequenzen:** ODS-Layout (Zellen/Blätter) ist ein Datenvertrag zwischen Vorlage und Parser → Änderungen an der Vorlage brauchen Anpassung im Parser. Bei B2G ist die XML rechtlich maßgeblich, nicht die PDF-Ansicht.
 
-## 2026-11-23 — Rust, leichtgewichtig und minimalistisch
+## 2026-11-23 — ~~Rust, leichtgewichtig und minimalistisch~~ (ersetzt, siehe „Java 21 statt Rust“)
 
 - **Kontext:** Das Tool soll klein, schnell und leicht weiterzugeben sein.
 - **Entscheidung:** Implementierung in Rust. Jede neue Abhängigkeit braucht eine Begründung und wird hier eingetragen.
-- **Konsequenzen:** Das Rust-Ökosystem für PDF/A-3 und Factur-X ist dünner als bei Java oder Python. Für die Einbettung ist vermutlich eigene, schlanke Logik auf einer PDF-Crate nötig (unverifiziert, vor Umsetzung prüfen). Den ODS→PDF-Schritt kann LibreOffice im Headless-Modus übernehmen; das ist dann eine externe Laufzeitabhängigkeit.
+- **Status:** Am selben Tag durch die folgende Entscheidung ersetzt, bevor Code entstand.
+
+## 2026-11-23 — Java 21 statt Rust
+
+- **Kontext:** Der schwierige Teil von openbilling ist nicht das Programm selbst, sondern eine gültige XRechnung-XML, ein PDF/A-3 mit korrekter Factur-X-Einbettung (XMP-Extension-Schema, `/AF`, AFRelationship) und deren Prüfung. Die fertigen Werkzeuge dafür gibt es fast nur in Java: Mustangproject (CII, ZUGFeRD 2.5, PDF/A-3, Einbettung, Validierung) und der offizielle KoSIT-Validator. In Rust müsste die Factur-X-Einbettung selbst gebaut werden, und für die Validierung bräuchte das Programm zur Laufzeit trotzdem Java.
+- **Entscheidung:** Java 21 (LTS), Build mit Maven, Auslieferung später per `jpackage` als Installer mit eigener JRE. Minimalismus gilt weiter: kein Framework (kein Spring), Swing statt JavaFX, jede Bibliothek wird hier begründet.
+- **Konsequenzen:** Das Installationspaket wird größer (geschätzt 50–70 MB inklusive JRE, unverifiziert). Dafür kann die App jede XML **vor dem Export selbst mit dem KoSIT-Validator prüfen** und dem Nutzer Regel-IDs anzeigen. Geplante Bibliotheken: `org.mustangproject:library`, `org.kosit:validator`, SODS (ODS), openhtmltopdf (HTML → PDF/A-3), JUnit 5 für Tests. Jede wird beim Einbinden einzeln bestätigt.
+
+## 2026-11-23 — ODS mit Schlüssel/Wert-Blättern statt Zellkoordinaten
+
+- **Kontext:** Die `.ods` bleibt Quelle der Wahrheit und von Hand bearbeitbar. Ein Parser, der feste Zellen liest (z. B. `B7`), bricht, sobald jemand eine Zeile einfügt.
+- **Entscheidung:** Eine Rechnungs-ODS hat das Blatt `Daten` mit zwei Spalten `Feld | Wert`, wobei das Feld mit der BT-Kennung beginnt (z. B. `BT-1 Rechnungsnummer`), und das Blatt `Positionen` mit einer Kopfzeile aus BT-Kennungen (`BT-153`, `BT-129`, `BT-130`, `BT-146`, `BT-151`, `BT-152`) und einer Zeile je Position. Ein optionales Blatt `Ansicht` ist nur für Menschen da und wird nicht gelesen. Summen und Steuern berechnet die App mit `BigDecimal` (HALF_UP, BR-CO-Regeln), nicht LibreOffice. Die App darf die berechneten Werte zur Kontrolle zurückschreiben.
+- **Konsequenzen:** Der Datenvertrag besteht aus Blattnamen und BT-Kennungen, nicht aus Positionen. Rechnungen liegen in einem vom Nutzer gewählten Ordner (z. B. `Dokumente\openbilling\2026\`), dort neben der `.ods` auch das exportierte `.pdf` und `.xml`. Eine exportierte Rechnung wird im Blatt `Daten` als exportiert markiert, damit sie nicht unbemerkt geändert wird (GoBD-Aufbewahrung).
+
+## 2026-11-23 — Einstellungen, Stammdaten und Vorlagen im Benutzerprofil
+
+- **Kontext:** Firmendaten, Kunden und Vorlagen gelten für alle Rechnungen und sollen nicht in jede Datei kopiert werden müssen.
+- **Entscheidung:** Ablage unter `%APPDATA%\openbilling\` (später `$XDG_CONFIG_HOME/openbilling` bzw. `~/Library/Application Support/openbilling`): `einstellungen.properties` für Technisches (Rechnungsordner, XRechnung-Version für BT-24, Nummernschema, Zähler), `stammdaten.ods` (eigene Firma), `kunden.ods` (Kundenliste) und `vorlagen\` (Rechnungsvorlage `standard.ods`, PDF-Layout `layout.html`). Beim ersten Start legt die App diese Dateien aus mitgelieferten Vorgaben an.
+- **Konsequenzen:** Nutzerdaten sind ODS und damit mit demselben Parser lesbar und in LibreOffice editierbar. Für `.properties` reicht die Java-Standardbibliothek. Die nächste Rechnungsnummer ist das Maximum aus Zähler und höchster vorhandener Nummer im Rechnungsordner plus eins, damit nach einer Neuinstallation keine Nummer doppelt vergeben wird.
+
+## 2026-11-23 — PDF entsteht in der App, nicht über LibreOffice
+
+- **Kontext:** LibreOffice headless wäre eine schwere Laufzeitabhängigkeit, seine PDF/A-Optionen sind unverifiziert, und das Ergebnis sähe aus wie eine Tabelle.
+- **Entscheidung:** Rechnungsmodell → HTML-Vorlage → PDF/A-3b (openhtmltopdf, Schriften eingebettet) → Mustang bettet `xrechnung.xml` ein. Die XML wird zusätzlich separat ausgegeben. Falls schneller, dient in einer ersten Phase Mustangs eingebaute Visualisierung als Übergang (ob sie direkt PDF/A-3 liefert und anpassbar ist, ist unverifiziert).
+- **Konsequenzen:** PDF und XML entstehen aus demselben Modell und können nicht voneinander abweichen. LibreOffice wird nur noch zum Bearbeiten der ODS gebraucht.
 
 ## 2026-11-23 — Formatprüfung mit dem offiziellen KoSIT-Validator
 
@@ -22,5 +46,6 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 
 ## Offen
 
-- Libraries für ODS, XML und PDF; Bedienoberfläche (CLI, Desktop oder Web)
+- Bedienoberfläche: geplant ist zuerst eine CLI (`neu`, `pruefen`, `export`; bearbeitet wird in LibreOffice), danach ein kleines Swing-Fenster. Noch zu bestätigen.
 - Syntax der erzeugten XML: Empfehlung CII D16B als Hauptformat (nötig für die Factur-X-Einbettung), UBL optional. Noch zu bestätigen.
+- Ob CII über Mustangs Datenmodell oder eine eigene schlanke Serialisierung erzeugt wird: nach dem ersten Spike entscheiden.

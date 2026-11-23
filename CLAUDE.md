@@ -15,30 +15,29 @@ Datenfluss (Zielbild):
 ```
 .ods (Vorlage + Eingaben) → Parser → Rechnungsmodell (BT/BG nach EN 16931)
                                          ├→ XRechnung-XML → KoSIT-Validator
-                                         └→ PDF-Ansicht → PDF/A-3 + XML-Anhang
+                                         └→ HTML-Layout → PDF/A-3 + XML-Anhang
 ```
 
 Das Rechnungsmodell ist die zentrale Schicht: ODS-Parser und XML-/PDF-Generatoren hängen nur daran, nicht direkt aneinander. Das Zellen-/Blattlayout der ODS-Vorlage ist ein **Datenvertrag**: Wer die Vorlage ändert, passt den Parser und die Tests gleich mit an.
 
-## Stack und Leitlinie: Rust, leichtgewichtig, minimalistisch
+## Stack und Leitlinie: Java 21, leichtgewichtig, minimalistisch
 
-- Sprache ist **Rust** (stable, Cargo). Ziel ist ein kleines, schnelles Programm ohne Laufzeitabhängigkeiten außer denen, die wirklich nötig sind.
+- Sprache ist **Java 21 (LTS)**, Build mit **Maven**. Grund (siehe `knowledge/decisions.md`): Mustangproject und der KoSIT-Validator sind Java-Bibliotheken; die App prüft jede XML vor dem Export selbst.
 - **Minimalismus ist eine Anforderung, keine Kür:**
-  - Jede neue Crate braucht einen Grund. Erst prüfen, ob `std` oder eine schon vorhandene Crate reicht. Bei Crates schlanke Features wählen (`default-features = false`).
-  - Kein Framework, keine unnötigen Abstraktionsschichten, keine Traits und Generics auf Vorrat.
-  - Eine schlichte Bedienoberfläche geht vor einer aufwendigen.
+  - Jede neue Bibliothek braucht einen Grund. Erst prüfen, ob die JDK-Standardbibliothek oder eine schon vorhandene Bibliothek reicht.
+  - Kein Framework (kein Spring, kein DI-Container), keine unnötigen Abstraktionsschichten, keine Interfaces und Generics auf Vorrat. Records für das Datenmodell.
+  - Eine schlichte Bedienoberfläche geht vor einer aufwendigen: zuerst CLI, dann Swing (im JDK), kein JavaFX.
+  - Geldbeträge immer `BigDecimal`, nie `double`.
 - Neue Abhängigkeiten und ihren Grund in `knowledge/decisions.md` festhalten.
-- Das Projekt hat noch keinen Code. Beim Anlegen `cargo new` verwenden. Weicht der Aufbau von den Befehlen unten ab (zum Beispiel bei einem Workspace), aktualisiere diesen Abschnitt.
+- Ablage: Rechnungen in einem vom Nutzer gewählten Ordner; Einstellungen, Stammdaten und Vorlagen unter `%APPDATA%\openbilling\` (Details in `decisions.md`).
+- Das Maven-Projekt wird gerade angelegt. Weicht der Aufbau von den Befehlen unten ab, aktualisiere diesen Abschnitt.
 
-```sh
-cargo build                      # Build
-cargo run -- <args>              # Programm starten
-cargo test                       # alle Tests
-cargo test <name>                # einzelner Test (Substring des Testnamens)
-cargo test <name> -- --nocapture # mit println-Ausgabe
-cargo clippy -- -D warnings      # Lint (muss sauber sein)
-cargo fmt                        # Formatieren (vor jedem Commit)
-cargo build --release            # schlankes Release-Binary
+```powershell
+mvn compile                          # Build
+mvn exec:java -Dexec.args="<args>"   # Programm starten
+mvn test                             # alle Tests
+mvn test -Dtest=<Klasse>#<methode>   # einzelner Test
+mvn package                          # JAR bauen
 ```
 
 ## Fachwissen: zuerst `knowledge/` lesen
@@ -58,7 +57,7 @@ Jede erzeugte XML muss den **KoSIT-Validator** bestehen. Ein Feature gilt erst a
 .\scripts\validate.ps1 tests\fixtures\minimal-ubl.xml tests\fixtures\minimal-cii.xml   # Referenzbeispiele, müssen ACCEPTABLE sein
 ```
 
-Voraussetzung ist Java 11+ (Entwicklungswerkzeug, nicht Teil des Programms): `winget install EclipseAdoptium.Temurin.21.JRE`. Die Versionen von Validator und Konfiguration sind in `scripts/setup-validator.ps1` festgelegt. Bei einem neuen KoSIT-Release dort anheben und die Fixtures erneut prüfen.
+Voraussetzung ist ein JDK 21 (`winget install EclipseAdoptium.Temurin.21.JDK`) und Maven. Die Skripte nutzen den Validator als eigenständiges JAR zur Gegenprobe; im Programm selbst wird er als Bibliothek eingebunden. Die Versionen von Validator und Konfiguration sind in `scripts/setup-validator.ps1` festgelegt. Bei einem neuen KoSIT-Release dort anheben und die Fixtures erneut prüfen.
 
 Abgelehnte Dateien zeigen die Regel-ID (z. B. `BR-DE-15`) in der Tabelle. Details stehen im HTML-Bericht unter `out/validation/`.
 
