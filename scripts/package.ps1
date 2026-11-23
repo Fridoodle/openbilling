@@ -13,6 +13,11 @@ if (-not (Test-Path "$cfg\scenarios.xml")) { throw "$cfg fehlt. Erst .\scripts\s
 
 & .\tools\maven\bin\mvn.cmd -q clean package
 if ($LASTEXITCODE -ne 0) { throw 'Maven-Build fehlgeschlagen' }
+# Liste aller mitgelieferten Bibliotheken mit Lizenz (nur Build-Plugin, keine Abhängigkeit)
+& .\tools\maven\bin\mvn.cmd -q org.codehaus.mojo:license-maven-plugin:2.4.0:add-third-party `
+    '-Dlicense.outputDirectory=target\paket' '-Dlicense.thirdPartyFilename=DRITTANBIETER.txt' `
+    '-Dlicense.excludedScopes=test,provided,system'
+if ($LASTEXITCODE -ne 0) { throw 'Lizenzliste fehlgeschlagen' }
 
 # Eingabe für jpackage: JAR, lib\ und kosit\config landen im Paket unter app\
 $eingabe = 'target\paket\eingabe'
@@ -47,6 +52,8 @@ $bild = 'target\paket\bild'
 if ($LASTEXITCODE -ne 0) { throw 'jpackage fehlgeschlagen' }
 
 Copy-Item README.md "$bild\openbilling\LIESMICH.md"
+Copy-Item LICENSE "$bild\openbilling\LICENSE.txt"
+Copy-Item target\paket\DRITTANBIETER.txt "$bild\openbilling\DRITTANBIETER.txt"
 New-Item -ItemType Directory -Force dist | Out-Null
 $zip = "dist\openbilling-$version-windows-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip }
