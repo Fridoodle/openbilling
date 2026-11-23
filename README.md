@@ -12,20 +12,25 @@ E-Rechnungen nach **XRechnung** erstellen, ohne Abo und ohne Cloud. openbilling 
 
 ## Installation (Windows)
 
-1. Unter [Releases](https://github.com/Fridoodle/openbilling/releases) die Datei `openbilling-<version>-windows-x64.zip` herunterladen.
-2. Entpacken, zum Beispiel nach `C:\Users\<du>\Programme\openbilling` oder auf einen USB-Stick.
-3. `openbilling.exe` starten.
+Unter [Releases](https://github.com/Fridoodle/openbilling/releases) gibt es zwei Varianten. Java muss in keinem Fall installiert sein, beide bringen ihre eigene Laufzeit mit. Deine Einstellungen, Vorlagen und das Adressbuch liegen unter `%APPDATA%\openbilling\` und bleiben bei Updates und beim Deinstallieren erhalten.
 
-Java muss **nicht** installiert sein, das Paket bringt seine eigene Laufzeit mit. Es braucht keine Administratorrechte und schreibt nichts in die Registry. Deinstallieren heißt: Ordner löschen. Deine Einstellungen, Vorlagen und das Adressbuch liegen unter `%APPDATA%\openbilling\` und bleiben dabei erhalten.
+**Installer (empfohlen):** `openbilling-<version>-windows-x64-setup.exe` herunterladen und starten.
+
+- Installiert ohne Administratorrechte nach `%LOCALAPPDATA%\Programs\openbilling` (auf Wunsch für alle Benutzer) und legt einen Eintrag im Startmenü an, wahlweise auch auf dem Desktop.
+- Bietet openbilling für `.ods`-Dateien unter **Öffnen mit** an. Die Standardzuordnung, meist LibreOffice, bleibt unverändert. Wer `.ods` per Doppelklick in openbilling öffnen will, wählt dort einmal **Immer diese App verwenden**.
+- **Update:** Den Installer der neuen Version starten. Er ersetzt die alte Version im selben Ordner, ein laufendes openbilling wird vorher geschlossen.
+- **Deinstallieren:** Windows-Einstellungen → Apps → Installierte Apps → openbilling → Deinstallieren.
+
+**Portabel:** `openbilling-<version>-windows-x64.zip` herunterladen, entpacken (zum Beispiel auf einen USB-Stick) und `openbilling.exe` starten. Diese Variante schreibt nichts in die Registry. Deinstallieren heißt: Ordner löschen, Update heißt: neue Version entpacken und den alten Ordner löschen.
 
 ### Windows-Warnung beim ersten Start
 
 Die Programmdateien sind noch nicht digital signiert. Windows SmartScreen zeigt deshalb beim ersten Start „Der Computer wurde durch Windows geschützt“. Klicke auf **Weitere Informationen → Trotzdem ausführen**. Das ist bei neuen Open-Source-Programmen ohne Signatur üblich.
 
-Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen ZIP mit der Datei `.sha256` im Release:
+Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen Datei mit der zugehörigen `.sha256` im Release:
 
 ```powershell
-Get-FileHash openbilling-0.1.0-windows-x64.zip -Algorithm SHA256
+Get-FileHash openbilling-0.1.0-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm. Bitte melde es als [Issue](https://github.com/Fridoodle/openbilling/issues) mit dem Namen des Scanners.

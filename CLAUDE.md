@@ -46,7 +46,7 @@ java -jar target\openbilling.jar --hilfe            # Hilfe zur Kommandozeile
 java -jar target\openbilling.jar neu rechnung.ods   # neue Rechnung aus %APPDATA%\openbilling\vorlagen\standard.ods
 java -jar target\openbilling.jar pruefen rechnung.ods
 java -jar target\openbilling.jar export rechnung.ods   # rechnung.xml + rechnung.pdf (PDF/A-3 mit XML)
-.\scripts\package.ps1                              # Release: dist\openbilling-<version>-windows-x64.zip (jpackage, eigene JRE)
+.\scripts\package.ps1                              # Release: dist\openbilling-<version>-windows-x64.zip + -setup.exe (jpackage + Inno Setup)
 ```
 
 Exit-Codes der CLI: 0 ok, 1 Rechnung ungültig, 2 Bedienfehler oder ODS unvollständig. Der Validator braucht `tools/kosit/config` relativ zum Arbeitsverzeichnis, oder `kosit.konfiguration=<pfad>` in `%APPDATA%\openbilling\einstellungen.properties`.
