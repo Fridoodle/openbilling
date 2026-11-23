@@ -93,8 +93,11 @@ public final class PdfExport {
             try (InputStream in = PdfExport.class.getClassLoader().getResourceAsStream("fop-config.xconf")) {
                 URI basis = new File(".").toURI();
                 var resolver = new ClasspathResolverURIAdapter();
+                // ohne Complex-Script-Features setzt FOP keine Ligaturen („ft“ in „Lastschrift“), die sich
+                // aus dem PDF nicht als Text kopieren lassen (lessons-learned.md)
                 FopFactory f = new FopFactoryBuilder(basis, resolver)
-                        .setConfiguration(new DefaultConfigurationBuilder().build(in)).build();
+                        .setConfiguration(new DefaultConfigurationBuilder().build(in))
+                        .setComplexScriptFeatures(false).build();
                 f.getFontManager().setResourceResolver(
                         ResourceResolverFactory.createInternalResourceResolver(basis, resolver));
                 fop = f;
