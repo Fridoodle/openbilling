@@ -86,7 +86,14 @@ final class Formular extends JPanel implements Scrollable {
      * Verkäuferkontakt nach BR-DE-5/6/7. Die E-Mail des Empfängers vertritt seine E-Rechnungs-Adresse (BT-49).
      */
     private static final Set<String> PFLICHT = Set.of("BT-1", "BT-2", "BT-10", "BT-27", "BT-37", "BT-38",
-            "BT-40", "BT-41", "BT-42", "BT-43", "BT-44", "BT-52", "BT-53", "BT-55", "BT-58", "BT-84");
+            "BT-40", "BT-41", "BT-42", "BT-43", "BT-44", "BT-52", "BT-53", "BT-55", "BT-58", "BT-84", "BT-87",
+            "BT-89", "BT-90", "BT-91");
+
+    /** Anzeige ↔ Zahlungsart (BT-81, UNTDID 4461). */
+    private static final String[][] ZAHLUNGSARTEN = {
+        {"SEPA-Überweisung", "58"}, {"SEPA-Lastschrift", "59"}, {"Kreditkarte", "54"}, {"Debitkarte", "55"},
+        {"Barzahlung", "10"}, {"PayPal oder anderer Online-Dienst", "68"},
+    };
 
     private final Map<String, JTextComponent> felder = new LinkedHashMap<>();
     private final Map<String, String> namen = new HashMap<>();
@@ -117,6 +124,9 @@ final class Formular extends JPanel implements Scrollable {
     private final JLabel gesamt = new JLabel();
     private final JTextArea beschreibung = new JTextArea(4, 4);
     private boolean waehlt;
+    private final JComboBox<String> art = new JComboBox<>();
+    /** Felder je Zahlungsart; nur die passende Gruppe ist sichtbar. */
+    private Map<String, JPanel> artGruppen;
     private Map<String, String> rest = new HashMap<>();
     private boolean laedt;
 
@@ -168,8 +178,28 @@ final class Formular extends JPanel implements Scrollable {
         parteien.add(empfaenger);
 
         JPanel zahlung = abschnitt("Zahlung", null);
-        zahlung.add(zeile(feld("BT-84", "IBAN", "Zahlung"), 3, feld("BT-86", "BIC", "Zahlung"), 2));
-        zahlung.add(zeile(feld("BT-85", "Kontoinhaber", "Zahlung"), 1));
+        zahlung.add(zeile(zahlungsart(), 1));
+        JPanel ueberweisung = gruppe(
+                zeile(feld("BT-84", "IBAN", "Zahlung"), 3, feld("BT-86", "BIC", "Zahlung"), 2),
+                zeile(feld("BT-85", "Kontoinhaber", "Zahlung"), 1));
+        JPanel lastschrift = gruppe(
+                zeile(feld("BT-90", "Gläubiger-ID", "Lastschrift"), 1, feld("BT-89", "Mandatsreferenz", "Lastschrift"), 1),
+                zeile(feld("BT-91", "IBAN des Kunden", "Lastschrift"), 1));
+        tipp("BT-90", "Ihre Gläubiger-Identifikationsnummer von der Bundesbank, z. B. DE98ZZZ09999999999.");
+        tipp("BT-89", "Referenz des SEPA-Mandats, das der Kunde unterschrieben hat. Wird mit dem Kunden im"
+                + " Adressbuch gespeichert.");
+        tipp("BT-91", "Konto, von dem der Betrag eingezogen wird. Im PDF steht es verkürzt.");
+        JPanel karte = gruppe(zeile(feld("BT-87", "Letzte Ziffern der Karte", "Karte"), 1,
+                feld("BT-88", "Karteninhaber", "Karte"), 2));
+        tipp("BT-87", "Nur die letzten 4 bis 6 Ziffern, nie die ganze Kartennummer.");
+        JPanel online = gruppe(zeile(feld("BT-82", "Zahlungsdienst", "Zahlung"), 1));
+        felder.get("BT-82").putClientProperty("JTextField.placeholderText", "z. B. PayPal");
+        for (JPanel g : new JPanel[] {ueberweisung, lastschrift, karte, online}) {
+            zahlung.add(g);
+        }
+        artGruppen = Map.of("ueberweisung", ueberweisung, "lastschrift", lastschrift, "karte", karte,
+                "online", online);
+        zeigeZahlungsart();
         zahlung.add(zeile(feld("BT-83", "Verwendungszweck", "Zahlung"), 1));
         zahlung.add(zeile(feld("BT-120", "Grund der Steuerbefreiung", "Zahlung"), 1));
         tipp("BT-120", "Nur nötig, wenn eine Position steuerfrei ist, z. B. Kleinunternehmer nach § 19 UStG.");
@@ -229,6 +259,72 @@ final class Formular extends JPanel implements Scrollable {
     }
 
     // ------------------------------------------------------------ Aufbau
+
+    /** Auswahl der Zahlungsart (BT-81), beschriftet wie ein Eingabefeld. */
+    private JComponent zahlungsart() {
+        for (String[] a : ZAHLUNGSARTEN) {
+            art.addItem(a[0]);
+        }
+        art.addActionListener(e -> {
+            zeigeZahlungsart();
+            geaendert();
+        });
+        art.setToolTipText("Lastschrift und Karte brauchen eigene Angaben, bar und online keine.");
+        JLabel l = gedaempft(new JLabel("Zahlungsart"));
+        l.putClientProperty("FlatLaf.styleClass", "small");
+        l.setLabelFor(art);
+        JPanel p = new JPanel(new BorderLayout(0, 3));
+        p.add(l, BorderLayout.NORTH);
+        p.add(art);
+        return p;
+    }
+
+    /** Zeilen, die nur bei bestimmten Zahlungsarten sichtbar sind. */
+    private static JPanel gruppe(JComponent... zeilen) {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setAlignmentX(LEFT_ALIGNMENT);
+        for (JComponent z : zeilen) {
+            p.add(z);
+        }
+        return p;
+    }
+
+    /** BT-81 der Auswahl. Ein Code, den die Liste nicht kennt (aus einer ODS), steht als „Code 30“ darin. */
+    private String artCode() {
+        String gewaehlt = (String) art.getSelectedItem();
+        for (String[] a : ZAHLUNGSARTEN) {
+            if (a[0].equals(gewaehlt)) {
+                return a[1];
+            }
+        }
+        return gewaehlt == null ? "58" : gewaehlt.replace("Code ", "");
+    }
+
+    private void waehleArt(String code) {
+        for (String[] a : ZAHLUNGSARTEN) {
+            if (a[1].equals(code)) {
+                art.setSelectedItem(a[0]);
+                return;
+            }
+        }
+        if (((javax.swing.DefaultComboBoxModel<String>) art.getModel()).getIndexOf("Code " + code) < 0) {
+            art.addItem("Code " + code);
+        }
+        art.setSelectedItem("Code " + code);
+    }
+
+    private void zeigeZahlungsart() {
+        if (artGruppen == null) {
+            return;
+        }
+        var z = new Rechnung.Zahlung(artCode(), null, null, null, null);
+        artGruppen.get("ueberweisung").setVisible(z.istUeberweisung());
+        artGruppen.get("lastschrift").setVisible(z.istLastschrift());
+        artGruppen.get("karte").setVisible(z.istKarte());
+        artGruppen.get("online").setVisible(!z.istUeberweisung() && !z.istLastschrift() && !z.istKarte());
+        revalidate();
+    }
 
     private void partei(JPanel p, String gruppe, String name, String strasse, String plz, String ort, String land,
             String kontakt, String telefon, String email, String adresse) {
@@ -571,6 +667,7 @@ final class Formular extends JPanel implements Scrollable {
                 felder.get(paar[0]).setText(""); // gleich der E-Mail: Platzhalter „wie E-Mail“ genügt
             }
         }
+        waehleArt(e.daten().getOrDefault("BT-81", openbilling.ods.RechnungOds.VORGABEN.get("BT-81")));
         positionen.setRowCount(0);
         for (String[] z : e.positionen()) {
             BigDecimal preis = zahl(z[4]);
@@ -585,10 +682,11 @@ final class Formular extends JPanel implements Scrollable {
     Entwurf entwurf() {
         beendeEingabe();
         Map<String, String> d = new LinkedHashMap<>(rest);
-        for (String bt : List.of("BT-3", "BT-5", "BT-23", "BT-24", "BT-81")) {
+        for (String bt : List.of("BT-3", "BT-5", "BT-23", "BT-24")) {
             // Pflichtangaben ohne eigenes Feld: fehlen sie in einer alten Vorlage, gilt die Vorgabe
             d.putIfAbsent(bt, openbilling.ods.RechnungOds.VORGABEN.get(bt));
         }
+        d.put("BT-81", artCode());
         felder.forEach((bt, f) -> {
             if (f.getText().isBlank()) {
                 d.remove(bt);
