@@ -152,3 +152,16 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** Jeder `JScrollPane` fängt das Mausrad ab, auch wenn er selbst nichts zu rollen hat. Das Ereignis erreicht den äußeren Scrollbereich nicht.
 - **Lösung:** `Formular.rollbar`: `setWheelScrollingEnabled(false)` und ein eigener `MouseWheelListener`. Er rollt das Feld, solange es dort noch etwas zu rollen gibt, und reicht das Ereignis sonst mit `SwingUtilities.convertMouseEvent` an den Elternteil weiter. Von dort wandert es bis zum äußeren `JScrollPane`.
 - **Quelle:** 2026-11-23, JDK 21, geprüft mit simulierten `MouseWheelEvent`s.
+
+## FlatLaf-Zoom (Schriftgröße): was mitwächst und was nicht
+
+- **Ziel:** Unter „Ansicht → Schriftgröße“ die ganze Oberfläche vergrößern (100 % bis 200 %), z. B. für ältere Nutzer.
+- **Lösung:** `UIScale.setZoomFactor(f)` (FlatLaf ab 3.6) und danach das Design neu setzen (`FlatLightLaf.setup()`/`FlatDarkLaf.setup()` plus `FlatLaf.updateUI()`). FlatLaf rechnet den Zoom beim Aufbau der UI-Defaults in Schrift und Abstände ein; ein bloßes `updateUI()` reicht nicht. Beim Start den Zoom vor dem ersten `setup()` setzen.
+- **Stolperfallen:**
+  - Feste Pixelwerte (`setRowHeight(30)`, `setFixedCellHeight(34)`, `setPreferredSize`, Spaltenbreiten, Icon-Größen) wachsen nicht mit. Mit `UIScale.scale(…)` rechnen, und zwar dort, wo der Wert gelesen wird (`getPreferredSize()` überschreiben oder in `updateUI()` neu setzen), sonst gilt nach einem Wechsel zur Laufzeit der alte Wert.
+  - `font.deriveFont(…)` erzeugt eine normale Schrift (keine `UIResource`), die beim Zoom gleich groß bleibt. Stattdessen `putClientProperty("FlatLaf.style", "font: bold +5")`.
+  - `FlatEmptyBorder` skaliert zwar, ist aber eine `UIResource` und verschwindet beim `updateUI()` eines Panels. Deshalb `Formular.rand(…)`: ein `EmptyBorder` ohne `UIResource`, dessen Insets mit `UIScale.scale` gerechnet werden.
+  - `GridBagLayout` fällt auf die **Mindestgrößen** aller Kinder zurück, sobald der Platz in Breite *oder Höhe* kleiner ist als die bevorzugte Größe. Folge: mehrzeilige Felder schrumpfen auf eine Zeile, Knöpfe und Kopfzeilen zeigen „…“. Abhilfe: Inhalt nie breiter anfordern als der Sichtbereich, und unterhalb einer hochgerechneten Mindestbreite (`Formular.SCHMAL`) waagrecht rollen statt zu stauchen (`getScrollableTracksViewportWidth`).
+  - Die Startgröße des Fensters mit dem Zoom hochrechnen (begrenzt auf `getMaximumWindowBounds()`), sonst passt der vergrößerte Inhalt nicht.
+- **Prüfen:** Formular wie in der App in einen `JScrollPane` legen und offscreen rendern (siehe „Swing-Fenster ohne Bildschirm prüfen“), einmal mit Zoom beim Start und einmal mit Wechsel zur Laufzeit. Ohne `JScrollPane` greift der Höhen-Rückfall von `GridBagLayout` und das Bild täuscht.
+- **Quelle:** FlatLaf 3.8 (`com.formdev.flatlaf.util.UIScale`), 2026-11-23.

@@ -80,7 +80,7 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Adressbuch:** `%APPDATA%\openbilling\kunden.ods`, Blatt `Kunden`, Kopfzeile mit BT-Kennungen (Käuferfelder plus BT-10), eine Zeile je Kunde (`openbilling.ods.Kunden`). Der Name (BT-44) ist der Schlüssel: Speichern unter gleichem Namen ersetzt den Eintrag.
 - **Vereinfachungen im Formular:** Bleibt die E-Rechnungs-Adresse (BT-34/BT-49) leer, gilt die E-Mail (BT-43/BT-58). Das Schema (BT-34-1/BT-49-1) wird abgeleitet: mit `@` ist es `EM`, sonst beim Käufer `0204` (Leitweg-ID). Einheit und Steuer wählt man als Klartext (Stück = C62, Stunde = HUR, pauschal = LS; „19 %“ = S, „0 %“ = Z, „steuerfrei“ = E, „Reverse Charge“ = AE …); eigene Codes und Sätze lassen sich eintippen.
 - **Exporte:** „Als PDF mit XRechnung“ prüft mit dem KoSIT-Validator und schreibt nur ein exportbereites Hybrid-PDF. „Als PDF“ schreibt nur die Sichtkopie (`PdfExport.sicht`) ohne Validator; das ist keine E-Rechnung. Anders als die CLI schreibt das Fenster keine separate `.xml`.
-- **Konsequenzen:** Das Fenster findet die Validator-Konfiguration wie die CLI nur über `tools/kosit/config` im Arbeitsverzeichnis oder die Einstellung `kosit.konfiguration` (siehe „Offen“). Design und zuletzt benutzter Ordner stehen in `einstellungen.properties` (`ansicht.dunkel`, `rechnungsordner`).
+- **Konsequenzen:** Das Fenster findet die Validator-Konfiguration wie die CLI nur über `tools/kosit/config` im Arbeitsverzeichnis oder die Einstellung `kosit.konfiguration` (siehe „Offen“). Design, Schriftgröße (Zoomfaktor) und zuletzt benutzter Ordner stehen in `einstellungen.properties` (`ansicht.dunkel`, `ansicht.groesse`, `rechnungsordner`).
 
 ## 2026-11-23 — Leistungszeitraum, Bemerkung und Positionsbeschreibung
 
