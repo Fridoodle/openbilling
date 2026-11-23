@@ -49,6 +49,21 @@ class CiiSchreiberTest {
     }
 
     @Test
+    void leistungszeitraumBemerkungUndPositionsbeschreibung() throws Exception {
+        var basis = Testdaten.rechnung(List.of(new Position("1", "Planung", b("1"), "LS", b("3000.00"), null,
+                Steuerkategorie.S, b("19"), "Aufmaß des Bestandes\nund vorbereitende Planung")));
+        var r = new Rechnung(basis.spezifikation(), basis.prozess(), basis.nummer(), basis.datum(), basis.typ(),
+                basis.waehrung(), basis.faelligAm(), basis.kaeuferReferenz(), basis.zahlungsbedingungen(),
+                null, basis.verkaeufer(), basis.kaeufer(), basis.zahlung(), null, null, basis.positionen(),
+                "Leistungen gemäß Angebot vom 13.08.2026", java.time.LocalDate.of(2026, 8, 20),
+                java.time.LocalDate.of(2026, 11, 20));
+        String xml = CiiSchreiber.schreibe(r);
+        assertTrue(xml.contains("<ram:StartDateTime>") && xml.contains("<ram:IncludedNote>")
+                && xml.contains("<ram:Description>Aufmaß"), xml);
+        assertExportbereit(pruefe(r, "zeitraum"));
+    }
+
+    @Test
     void gemischteSaetzeUndBasismenge() throws Exception {
         var r = Testdaten.rechnung(List.of(
                 pos("1", "2", "50.00", Steuerkategorie.S, "19"),

@@ -61,9 +61,53 @@ public final class Einstellungen {
         return ordner.resolve("vorlagen").resolve("standard.ods");
     }
 
-    /** Vorgabe {@code tools/kosit/config} (relativ zum Arbeitsverzeichnis, per setup-validator.ps1). */
+    /** Ordner mit allen Rechnungsvorlagen ({@code *.ods}). */
+    public Path vorlagen() {
+        return ordner.resolve("vorlagen");
+    }
+
+    /** Adressbuch, siehe {@link openbilling.ods.Kunden}. */
+    public Path kunden() {
+        return ordner.resolve("kunden.ods");
+    }
+
+    public String wert(String schluessel, String vorgabe) {
+        return werte.getProperty(schluessel, vorgabe);
+    }
+
+    /** Setzt einen Wert und schreibt {@code einstellungen.properties} sofort. */
+    public void setze(String schluessel, String wert) throws IOException {
+        werte.setProperty(schluessel, wert);
+        Files.createDirectories(ordner);
+        try (var w = Files.newBufferedWriter(ordner.resolve(DATEI), StandardCharsets.UTF_8)) {
+            werte.store(w, "openbilling");
+        }
+    }
+
+    /**
+     * Einstellung {@code kosit.konfiguration}, sonst {@code tools/kosit/config} im Arbeitsverzeichnis
+     * (Entwicklung, per setup-validator.ps1), sonst {@code kosit/config} neben {@code openbilling.jar}
+     * (ausgeliefertes Paket, siehe scripts/package.ps1).
+     */
     public Path kositKonfiguration() {
-        return Path.of(werte.getProperty(KOSIT, "tools/kosit/config"));
+        String gesetzt = werte.getProperty(KOSIT);
+        if (gesetzt != null && !gesetzt.isBlank()) {
+            return Path.of(gesetzt);
+        }
+        Path entwicklung = Path.of("tools/kosit/config");
+        if (Files.exists(entwicklung.resolve("scenarios.xml"))) {
+            return entwicklung;
+        }
+        try {
+            Path jar = Path.of(Einstellungen.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            Path mitgeliefert = jar.resolveSibling("kosit").resolve("config");
+            if (Files.exists(mitgeliefert.resolve("scenarios.xml"))) {
+                return mitgeliefert;
+            }
+        } catch (Exception e) {
+            // kein JAR-Pfad ermittelbar: bei der Vorgabe bleiben
+        }
+        return entwicklung;
     }
 
     public String spezifikation() {

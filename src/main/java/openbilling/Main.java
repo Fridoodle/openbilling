@@ -26,6 +26,8 @@ public final class Main {
     private static final String HILFE = """
             openbilling – E-Rechnungen nach XRechnung aus OpenDocument-Tabellen
 
+              (ohne Argumente)                    Fenster öffnen
+              --hilfe                             diese Hilfe
               neu <rechnung.ods>                  neue Rechnung aus der eigenen Vorlage anlegen
               pruefen <rechnung.ods>              XRechnung erzeugen und mit dem KoSIT-Validator prüfen
               export <rechnung.ods> [--ueberschreiben]
@@ -47,6 +49,10 @@ public final class Main {
     }
 
     public static void main(String[] args) throws IOException {
+        if (args.length == 0 && !java.awt.GraphicsEnvironment.isHeadless()) {
+            openbilling.gui.Fenster.starte(Einstellungen.ausBenutzerprofil()); // ohne Argumente: Fenster
+            return;
+        }
         var out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
         var err = new PrintStream(System.err, true, StandardCharsets.UTF_8);
         System.exit(new Main(Einstellungen.ausBenutzerprofil(), out, err).ausfuehren(args));
@@ -132,7 +138,7 @@ public final class Main {
             return UNGUELTIG;
         }
         Files.writeString(xmlDatei, xml, StandardCharsets.UTF_8);
-        Files.write(pdfDatei, PdfExport.hybrid(xml));
+        Files.write(pdfDatei, PdfExport.hybrid(RechnungOds.lese(datei), xml));
         out.println("Geschrieben: " + xmlDatei);
         out.println("Geschrieben: " + pdfDatei + " (PDF/A-3 mit eingebetteter xrechnung.xml)");
         return OK;

@@ -14,7 +14,8 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Symptom:** `NullPointerException: … because "fopInput" is null` in `ZUGFeRDVisualizer.toPDFfromFOP`, auch mit einer gültigen Fixture.
 - **Ursache:** Fehler in der Variante, die das PDF als `byte[]` zurückgibt (in Mustang 2.26.0, Ursache nicht weiter untersucht).
 - **Lösung:** Die Variante `toPDF(xmlDatei, pdfDatei, sprache)` benutzen, die in eine Datei schreibt, und die Datei danach lesen (`PdfExport`). Bei einem Mustang-Update prüfen, ob der Fehler behoben ist.
-- **Quelle:** `PdfExport`, `PdfExportTest`, 2026-11-23.
+- **Stand:** openbilling ruft den Visualizer seit dem eigenen Layout nicht mehr auf (`decisions.md`, „PDF entsteht in der App“). Der Eintrag bleibt für den Fall, dass er wieder gebraucht wird.
+- **Quelle:** frühere Fassung von `PdfExport`, 2026-11-23.
 
 ## Maven unter PowerShell: `-D`-Argumente mit Punkt quoten
 
@@ -64,3 +65,56 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** Der Validator prüft mit `System.in.available()`, ob Eingabe gepipt wird. Ist stdin das Windows-NUL-Gerät, wirft diese Methode eine Exception. Eine PowerShell-Pipe (`@() | java …`) hilft nicht: PS 5.1 schickt dann Bytes, und der Validator liest stdin als Rechnung („Error on line 1 column 1 of stdin“).
 - **Lösung:** stdin auf eine **leere Datei** umleiten: `Start-Process … -RedirectStandardInput <leere Datei>`. Dann liefert `available()` 0 und die Dateiargumente werden normal verarbeitet. In Bash geht entsprechend `java … < leere-datei`.
 - **Quelle:** Validator 1.6.3, `scripts/validate.ps1`, 2026-11-23.
+
+## FlatLaf: selbst gesetzte Farben gehen beim Wechsel hell/dunkel verloren
+
+- **Symptom:** Ein Label mit `setForeground(UIManager.getColor("Label.disabledForeground"))` ist nach dem Umschalten des Designs wieder normal gefärbt; ein `LineBorder` behält die Farbe des alten Designs.
+- **Ursache:** `UIManager.getColor` liefert eine `UIResource`. Beim `updateUI()` ersetzt Swing solche Farben durch die Vorgabe der Komponente. Fest übergebene Farben in Rahmen werden dagegen gar nicht aktualisiert.
+- **Lösung:** Farben über FlatLaf-Stile setzen, z. B. `putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground")`, und in eigenen Rahmen oder Icons die Farbe erst in `paintBorder`/`paintIcon` aus dem `UIManager` holen. Umschalten mit `FlatDarkLaf.setup()` bzw. `FlatLightLaf.setup()` und danach `FlatLaf.updateUI()`.
+- **Quelle:** FlatLaf 3.8, `openbilling.gui.Formular.gedaempft`, 2026-11-23.
+
+## Zwei Ablehnungen, die bei Freiberuflern fast immer auftreten
+
+- **Symptom:** Der Validator lehnt eine sonst vollständige Rechnung ab mit `PEPPOL-EN16931-R001` („Business process MUST be provided“) oder `BR-CO-26`.
+- **Ursache:** XRechnung verlangt den Geschäftsprozess BT-23, obwohl er in EN 16931 optional ist. `BR-CO-26` verlangt vom Verkäufer eine USt-IdNr. (BT-31), eine Registernummer (BT-30) oder eine Verkäuferkennung (BT-29). Die Steuernummer (BT-32) allein genügt nicht, und viele Freiberufler haben nur diese.
+- **Lösung:** BT-23 mit `urn:fdc:peppol.eu:2017:poacc:billing:01:1.0` vorbelegen (`RechnungOds.VORGABEN`). Ohne USt-IdNr. eine Kennung in BT-29 eintragen (Feld „Kennung“ beim Absender); der Wert ist frei wählbar.
+- **Quelle:** KoSIT-Validator 1.6.3 mit XRechnung 3.0, 2026-11-23.
+
+## Swing-Fenster ohne Bildschirm prüfen
+
+- **Symptom:** Ein Agent kann das Fenster nicht ansehen, ohne es auf dem Bildschirm des Nutzers zu öffnen.
+- **Lösung:** Fenster erzeugen, `addNotify()`, `setSize(…)`, `validate()`, dann `getRootPane().paint(…)` in ein `BufferedImage` und als PNG speichern. Die Menüleiste ist dabei, die Titelzeile des Betriebssystems nicht. Als Einstellungsordner einen temporären Ordner übergeben (`new Einstellungen(tmp)`), damit `%APPDATA%` unberührt bleibt.
+- **Quelle:** 2026-11-23.
+
+## Nativer Dateidialog statt `JFileChooser` (Windows)
+
+- **Symptom:** Der Swing-Dialog `JFileChooser` sieht unter Windows fremd aus und kennt weder Schnellzugriff noch Explorer-Suche. Nutzer wünschen den gewohnten Windows-Dialog.
+- **Irrweg:** `java.awt.FileDialog` öffnet unter Windows nur den alten, kleinen Common-Dialog (ohne Navigationsbereich, Adressleiste und Suche), weil AWT ihn mit einem Hook aufruft. Nutzer empfinden ihn als „Mini-Fenster“.
+- **Lösung:** `com.formdev.flatlaf.util.SystemFileChooser` (FlatLaf ab 3.6, also schon vorhanden) zeigt den modernen Explorer-Dialog (`IFileDialog`) und unter macOS/Linux den jeweiligen Systemdialog. Die API ähnelt `JFileChooser`. Die nötigen DLLs stecken im FlatLaf-JAR. Mit `putPlatformProperty(WINDOWS_DEFAULT_EXTENSION, "ods")` hängt Windows die Endung selbst an und fragt beim Überschreiben korrekt nach. `Fenster.waehleZiel` prüft trotzdem weiter selbst, falls die Endung fehlt.
+- **Quelle:** 2026-11-23, Windows 11, JDK 21.
+
+## FOP direkt benutzen: Konfiguration und Seitenzahl
+
+- **Aufbau:** `new FopFactoryBuilder(basisUri, new ClasspathResolverURIAdapter()).setConfiguration(new DefaultConfigurationBuilder().build(strom))` mit `fop-config.xconf` aus dem Mustang-JAR, danach denselben Resolver am `FontManager` setzen, sonst findet FOP die Schriften unter `classpath:fonts/…` nicht. PDF/A über `agent.getRendererOptions().put("pdf-a-mode", "PDF/A-3b")`. So macht es auch Mustang selbst.
+- **Stolperfallen:** Die Konfiguration hat `strict-validation`, also keine leere `fo:table-body` und in jeder `fo:table-cell` ein Block. FO kennt kein „auf eine Seite verkleinern“; die Seitenzahl liefert `fop.getResults().getPageCount()` nach dem Lauf, deshalb rendert `PdfExport` notfalls mehrfach mit kleinerer Schrift. Abstände in Tabellenzeilen in `em` angeben, damit sie mit der Schrift schrumpfen.
+- **Quelle:** `PdfExport`, `Layout`, 2026-11-23.
+
+## PowerShell: `$input` ist eine automatische Variable
+
+- **Symptom:** Ein Skript, das `$input = 'target\paket\eingabe'` setzt und danach `Copy-Item … $input` aufruft, verhält sich unberechenbar.
+- **Ursache:** `$input` ist in PowerShell der Enumerator für Pipeline-Eingaben und darf nicht als eigene Variable benutzt werden. Ähnlich: `$args`, `$host`, `$error`, `$matches`.
+- **Lösung:** Andere Namen wählen (in `scripts/package.ps1`: `$eingabe`).
+- **Quelle:** https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_automatic_variables, 2026-11-23.
+
+## PowerShell 5.1 liest `.ps1` ohne BOM als ANSI
+
+- **Symptom:** Umlaute in Meldungen eines Skripts erscheinen als `Ã¼`.
+- **Ursache:** Windows PowerShell 5.1 nimmt für Skriptdateien ohne BOM die ANSI-Codepage an. Das ist die Gegenrichtung zum Eintrag „PowerShell 5.1 schreibt UTF-8 mit BOM“: `.java`-Dateien dürfen keinen BOM haben, `.ps1`-Dateien mit Umlauten brauchen einen.
+- **Lösung:** `.ps1` mit Umlauten als UTF-8 **mit** BOM speichern (`scripts/package.ps1`) oder auf Umlaute verzichten.
+- **Quelle:** 2026-11-23.
+
+## jpackage: `jdeps --print-module-deps` reicht nicht für die gekürzte Laufzeit
+
+- **Problem:** jdeps findet nur statische Verweise. Module, die über Reflection oder ServiceLoader geladen werden, fehlen in seiner Liste und damit in der gekürzten Laufzeit. Kandidaten sind `jdk.localedata` (laut JDK-Doku liegen Gebietsschemata außer Englisch dort, also auch deutsche Zahlen- und Datumsformate), `jdk.charsets`, `jdk.crypto.ec` und `java.naming`. Ein konkreter Fehler ohne diese Module wurde nicht beobachtet, sie sind vorsorglich drin (unverifiziert, ob nötig).
+- **Lösung:** jdeps-Liste plus diese Module in `scripts/package.ps1` eintragen und das entpackte Paket aus einem fremden Ordner testen (`openbilling-cli.exe export` auf eine Kopie von `tests/fixtures/minimal.ods`), damit nicht versehentlich `tools/kosit/config` im Arbeitsverzeichnis gefunden wird. jdeps braucht bei Mustangs Abhängigkeiten `--ignore-missing-deps --multi-release 21`.
+- **Quelle:** 2026-11-23.

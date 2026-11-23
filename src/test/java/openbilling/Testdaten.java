@@ -47,6 +47,15 @@ public final class Testdaten {
                 Steuerkategorie.S, b("19"))));
     }
 
+    /** {@link #minimal()} mit Schlussformel (nur Sichtkopie). */
+    public static Rechnung mitSchlussformel(String schlussformel) {
+        Rechnung r = minimal();
+        return new Rechnung(r.spezifikation(), r.prozess(), r.nummer(), r.datum(), r.typ(), r.waehrung(),
+                r.faelligAm(), r.kaeuferReferenz(), r.zahlungsbedingungen(), r.lieferdatum(), r.verkaeufer(),
+                r.kaeufer(), r.zahlung(), r.befreiungsgrund(), r.vorausbezahlt(), r.positionen(), r.bemerkung(),
+                r.leistungVon(), r.leistungBis(), schlussformel);
+    }
+
     public static Position pos(String id, String menge, String preis, Steuerkategorie k, String satz) {
         return new Position(id, "Leistung " + id, b(menge), "C62", b(preis), null,
                 k, satz == null ? null : b(satz));

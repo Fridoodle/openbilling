@@ -25,6 +25,11 @@ import java.util.List;
  * @param befreiungsgrund BT-120 für Steuerkategorien ungleich S, optional
  * @param vorausbezahlt   BT-113, optional
  * @param positionen      BG-25, mindestens eine
+ * @param bemerkung       BT-22 Freitext zur Rechnung (z. B. Einleitung, Bauvorhaben), optional
+ * @param leistungVon     BT-73 Beginn des Leistungszeitraums (BG-14), optional
+ * @param leistungBis     BT-74 Ende des Leistungszeitraums (BG-14), optional
+ * @param schlussformel   kein BT: Grußformel am Ende der Sichtkopie (z. B. Dank und Unterschrift), nur im PDF,
+ *                        nicht in der XRechnung, optional, darf mehrzeilig sein
  */
 public record Rechnung(
         String spezifikation,
@@ -42,7 +47,32 @@ public record Rechnung(
         Zahlung zahlung,
         String befreiungsgrund,
         BigDecimal vorausbezahlt,
-        List<Position> positionen) {
+        List<Position> positionen,
+        String bemerkung,
+        LocalDate leistungVon,
+        LocalDate leistungBis,
+        String schlussformel) {
+
+    /** Ohne Schlussformel. */
+    public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
+            String waehrung, LocalDate faelligAm, String kaeuferReferenz, String zahlungsbedingungen,
+            LocalDate lieferdatum, Partei verkaeufer, Partei kaeufer, Zahlung zahlung, String befreiungsgrund,
+            BigDecimal vorausbezahlt, List<Position> positionen, String bemerkung, LocalDate leistungVon,
+            LocalDate leistungBis) {
+        this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, bemerkung, leistungVon, leistungBis, null);
+    }
+
+    /** Ohne Bemerkung und Leistungszeitraum. */
+    public Rechnung(String spezifikation, String prozess, String nummer, LocalDate datum, String typ,
+            String waehrung, LocalDate faelligAm, String kaeuferReferenz, String zahlungsbedingungen,
+            LocalDate lieferdatum, Partei verkaeufer, Partei kaeufer, Zahlung zahlung, String befreiungsgrund,
+            BigDecimal vorausbezahlt, List<Position> positionen) {
+        this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
+                zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
+                positionen, null, null, null, null);
+    }
 
     public Rechnung {
         positionen = List.copyOf(positionen);
@@ -102,6 +132,7 @@ public record Rechnung(
      * @param basismenge  BT-149, optional (Standard 1)
      * @param kategorie   BT-151
      * @param steuersatz  BT-152 in Prozent (bei Kategorie O ohne Bedeutung)
+     * @param beschreibung BT-154 ausführlicher Text zur Position, optional, darf mehrzeilig sein
      */
     public record Position(
             String id,
@@ -111,7 +142,14 @@ public record Rechnung(
             BigDecimal nettopreis,
             BigDecimal basismenge,
             Steuerkategorie kategorie,
-            BigDecimal steuersatz) {
+            BigDecimal steuersatz,
+            String beschreibung) {
+
+        /** Ohne Beschreibung. */
+        public Position(String id, String bezeichnung, BigDecimal menge, String einheit, BigDecimal nettopreis,
+                BigDecimal basismenge, Steuerkategorie kategorie, BigDecimal steuersatz) {
+            this(id, bezeichnung, menge, einheit, nettopreis, basismenge, kategorie, steuersatz, null);
+        }
 
         public Position {
             if (nettopreis.signum() < 0) {
