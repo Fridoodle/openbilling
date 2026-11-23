@@ -125,3 +125,10 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** Bei `ValueType: none` erzeugt Inno Setup nur den Schlüssel und ignoriert `ValueName`. Windows braucht unter `OpenWithProgids` aber einen Wert mit dem Namen der ProgId.
 - **Lösung:** `ValueType: string; ValueName: "openbilling.ods"; ValueData: ""` (leerer REG_SZ) mit `Flags: uninsdeletevalue`, damit beim Deinstallieren nur dieser Wert verschwindet und die Einträge anderer Programme bleiben.
 - **Quelle:** https://jrsoftware.org/ishelp/topic_registrysection.htm, `packaging/openbilling.iss`, 2026-11-23.
+
+## jpackage: ohne `--icon` zeigen Desktop und Startmenü das Java-Symbol
+
+- **Symptom:** Das laufende Fenster und sein Taskleisten-Knopf zeigen das openbilling-Symbol, die Desktop-Verknüpfung, das Startmenü, eine angeheftete Taskleiste und „Apps“ aber das Java-Standardsymbol.
+- **Ursache:** `setIconImages` setzt nur das Symbol des Fensters zur Laufzeit. Alles, was Windows ohne laufendes Programm anzeigt, liest das Symbol aus den Ressourcen von `openbilling.exe`. Ohne `--icon` setzt jpackage dort sein eigenes Standardsymbol ein.
+- **Lösung:** `jpackage --icon <datei.ico>`. Der zusätzliche Starter aus `--add-launcher` (`openbilling-cli.exe`) übernimmt das Symbol des Hauptstarters, wenn seine Properties-Datei kein `icon=` angibt. Prüfen ohne Installation: `[System.Drawing.Icon]::ExtractAssociatedIcon('openbilling.exe').ToBitmap().Save('x.png')` in PowerShell. Wer das Fenster per Skript sucht: Der jpackage-Starter startet sich als Kindprozess gleichen Namens noch einmal, das Fenster gehört dem Kind, nicht dem Prozess aus `Start-Process`. Eine .ico braucht kein Grafikwerkzeug: Kopf (6 Byte), je Bild ein 16-Byte-Verzeichniseintrag, dann die Bilder als BITMAPINFOHEADER mit doppelter Höhe plus BGRA-Zeilen von unten und 1-Bit-Maske (256 px als PNG), siehe `Symbol.ico()`.
+- **Quelle:** https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html (`--icon`), https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10) (ICO-Format), 2026-11-23.

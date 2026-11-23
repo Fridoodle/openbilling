@@ -30,7 +30,7 @@ Die Programmdateien sind noch nicht digital signiert. Windows SmartScreen zeigt 
 Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen Datei mit der zugehörigen `.sha256` im Release:
 
 ```powershell
-Get-FileHash openbilling-0.1.2-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash openbilling-0.1.3-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm. Bitte melde es als [Issue](https://github.com/Fridoodle/openbilling/issues) mit dem Namen des Scanners.
