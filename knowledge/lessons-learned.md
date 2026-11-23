@@ -64,3 +64,16 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** Der Validator prüft mit `System.in.available()`, ob Eingabe gepipt wird. Ist stdin das Windows-NUL-Gerät, wirft diese Methode eine Exception. Eine PowerShell-Pipe (`@() | java …`) hilft nicht: PS 5.1 schickt dann Bytes, und der Validator liest stdin als Rechnung („Error on line 1 column 1 of stdin“).
 - **Lösung:** stdin auf eine **leere Datei** umleiten: `Start-Process … -RedirectStandardInput <leere Datei>`. Dann liefert `available()` 0 und die Dateiargumente werden normal verarbeitet. In Bash geht entsprechend `java … < leere-datei`.
 - **Quelle:** Validator 1.6.3, `scripts/validate.ps1`, 2026-11-23.
+
+## FlatLaf: selbst gesetzte Farben gehen beim Wechsel hell/dunkel verloren
+
+- **Symptom:** Ein Label mit `setForeground(UIManager.getColor("Label.disabledForeground"))` ist nach dem Umschalten des Designs wieder normal gefärbt; ein `LineBorder` behält die Farbe des alten Designs.
+- **Ursache:** `UIManager.getColor` liefert eine `UIResource`. Beim `updateUI()` ersetzt Swing solche Farben durch die Vorgabe der Komponente. Fest übergebene Farben in Rahmen werden dagegen gar nicht aktualisiert.
+- **Lösung:** Farben über FlatLaf-Stile setzen, z. B. `putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground")`, und in eigenen Rahmen oder Icons die Farbe erst in `paintBorder`/`paintIcon` aus dem `UIManager` holen. Umschalten mit `FlatDarkLaf.setup()` bzw. `FlatLightLaf.setup()` und danach `FlatLaf.updateUI()`.
+- **Quelle:** FlatLaf 3.8, `openbilling.gui.Formular.gedaempft`, 2026-11-23.
+
+## Swing-Fenster ohne Bildschirm prüfen
+
+- **Symptom:** Ein Agent kann das Fenster nicht ansehen, ohne es auf dem Bildschirm des Nutzers zu öffnen.
+- **Lösung:** Fenster erzeugen, `addNotify()`, `setSize(…)`, `validate()`, dann `getRootPane().paint(…)` in ein `BufferedImage` und als PNG speichern. Die Menüleiste ist dabei, die Titelzeile des Betriebssystems nicht. Als Einstellungsordner einen temporären Ordner übergeben (`new Einstellungen(tmp)`), damit `%APPDATA%` unberührt bleibt.
+- **Quelle:** 2026-11-23.
