@@ -118,3 +118,10 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Problem:** jdeps findet nur statische Verweise. Module, die über Reflection oder ServiceLoader geladen werden, fehlen in seiner Liste und damit in der gekürzten Laufzeit. Kandidaten sind `jdk.localedata` (laut JDK-Doku liegen Gebietsschemata außer Englisch dort, also auch deutsche Zahlen- und Datumsformate), `jdk.charsets`, `jdk.crypto.ec` und `java.naming`. Ein konkreter Fehler ohne diese Module wurde nicht beobachtet, sie sind vorsorglich drin (unverifiziert, ob nötig).
 - **Lösung:** jdeps-Liste plus diese Module in `scripts/package.ps1` eintragen und das entpackte Paket aus einem fremden Ordner testen (`openbilling-cli.exe export` auf eine Kopie von `tests/fixtures/minimal.ods`), damit nicht versehentlich `tools/kosit/config` im Arbeitsverzeichnis gefunden wird. jdeps braucht bei Mustangs Abhängigkeiten `--ignore-missing-deps --multi-release 21`.
 - **Quelle:** 2026-11-23.
+
+## Inno Setup: `ValueType: none` legt keinen Registry-Wert an
+
+- **Symptom:** Nach der Installation fehlt openbilling unter „Öffnen mit“. `reg query HKCU\Software\Classes\.ods\OpenWithProgids /v openbilling.ods` findet den Wert nicht.
+- **Ursache:** Bei `ValueType: none` erzeugt Inno Setup nur den Schlüssel und ignoriert `ValueName`. Windows braucht unter `OpenWithProgids` aber einen Wert mit dem Namen der ProgId.
+- **Lösung:** `ValueType: string; ValueName: "openbilling.ods"; ValueData: ""` (leerer REG_SZ) mit `Flags: uninsdeletevalue`, damit beim Deinstallieren nur dieser Wert verschwindet und die Einträge anderer Programme bleiben.
+- **Quelle:** https://jrsoftware.org/ishelp/topic_registrysection.htm, `packaging/openbilling.iss`, 2026-11-23.
