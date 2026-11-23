@@ -165,3 +165,10 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
   - Die Startgröße des Fensters mit dem Zoom hochrechnen (begrenzt auf `getMaximumWindowBounds()`), sonst passt der vergrößerte Inhalt nicht.
 - **Prüfen:** Formular wie in der App in einen `JScrollPane` legen und offscreen rendern (siehe „Swing-Fenster ohne Bildschirm prüfen“), einmal mit Zoom beim Start und einmal mit Wechsel zur Laufzeit. Ohne `JScrollPane` greift der Höhen-Rückfall von `GridBagLayout` und das Bild täuscht.
 - **Quelle:** FlatLaf 3.8 (`com.formdev.flatlaf.util.UIScale`), 2026-11-23.
+
+## FOP setzt Ligaturen, die sich nicht aus dem PDF kopieren lassen
+
+- **Symptom:** Im PDF steht „SEPA-Lastschrift“ richtig da, aber PDFBox (und damit auch Kopieren im PDF-Betrachter oder eine Suche) liefert „SEPA-Lastschri?“.
+- **Ursache:** FOP wendet mit den Complex-Script-Features die OpenType-Ligaturen (GSUB) der eingebetteten Schrift Source Sans Pro an und ersetzt „ft“ durch eine Ligatur-Glyphe. Für diese Glyphe gibt es keine Unicode-Zuordnung (ToUnicode), also lässt sie sich nicht als Text zurücklesen. Betroffen waren alle Wörter mit „ft“, „fi“ usw., nicht nur die Lastschrift.
+- **Lösung:** `new FopFactoryBuilder(…).setComplexScriptFeatures(false)` in `PdfExport.fabrik()`. Für deutsche Rechnungstexte braucht openbilling keine Complex-Script-Funktionen (Arabisch, Indisch usw.). Der Test `PdfExportTest.lastschriftMitVorabankuendigung` prüft den Text.
+- **Quelle:** FOP 2.x, Option `<complex-scripts disabled="true"/>` bzw. `setComplexScriptFeatures`, 2026-11-23.
