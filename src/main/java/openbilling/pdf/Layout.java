@@ -42,8 +42,9 @@ final class Layout {
                 <fo:page-sequence master-reference="a4"><fo:flow flow-name="xsl-region-body">
                 """.formatted(pt));
 
-        // Kopf: Absendername. Der Abstand setzt die Empfängeranschrift ins Fenster eines DIN-Umschlags.
-        s.append("<fo:block font-size=\"16pt\" text-align=\"end\" space-after=\"20mm\">").append(x(v.name()))
+        // Kopf: Firmenname (OB-2), sonst Absendername.
+        // Der Abstand setzt die Empfängeranschrift ins Fenster eines DIN-Umschlags.
+        s.append("<fo:block font-size=\"16pt\" text-align=\"end\" space-after=\"20mm\">").append(x(r.kopfname()))
                 .append("</fo:block>\n");
 
         // Anschriften

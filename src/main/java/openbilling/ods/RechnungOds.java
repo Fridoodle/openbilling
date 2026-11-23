@@ -84,6 +84,7 @@ public final class RechnungOds {
         "BT-23 Geschäftsprozess (optional)",
         "Verkäufer",
         "BT-27 Name",
+        "OB-2 Firmenname im PDF-Kopf (optional, sonst BT-27, nicht in der XRechnung)",
         "BT-29 Verkäuferkennung (nötig ohne USt-IdNr.)",
         "BT-35 Straße",
         "BT-38 PLZ",
@@ -210,6 +211,7 @@ public final class RechnungOds {
         partei(w, r.verkaeufer(), "BT-27", "BT-29", "BT-35", "BT-38", "BT-37", "BT-40",
                 "BT-41", "BT-42", "BT-43", "BT-34", "BT-31");
         w.put("BT-32", r.verkaeufer().steuernummer());
+        w.put("OB-2", r.firmenname());
         partei(w, r.kaeufer(), "BT-44", "BT-46", "BT-50", "BT-53", "BT-52", "BT-55",
                 "BT-56", "BT-57", "BT-58", "BT-49", "BT-48");
         w.put("BT-81", r.zahlung().art());
@@ -445,7 +447,7 @@ public final class RechnungOds {
         }
         return new Rechnung(spezifikation, prozess, nummer, datum, typ, waehrung, faellig, referenz,
                 bedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiung, voraus, positionen,
-                bemerkung, von, bis, f.text("OB-1"));
+                bemerkung, von, bis, f.text("OB-1"), f.text("OB-2"));
     }
 
     private static Kontakt kontakt(Felder f, String name, String telefon, String email) {

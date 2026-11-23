@@ -154,6 +154,15 @@ class RechnungOdsTest {
     }
 
     @Test
+    void firmennameUeberstehtOdsUndFehltInDerXml() throws Exception {
+        Path datei = tmp.resolve("firma.ods");
+        RechnungOds.schreibe(Testdaten.mitFirmenname("Studio Beispiel"), datei);
+        assertEquals("Studio Beispiel", RechnungOds.lese(datei).firmenname());
+        assertEquals("Studio Beispiel", RechnungOds.leseEntwurf(datei).daten().get("OB-2"));
+        assertTrue(!CiiSchreiber.schreibe(RechnungOds.lese(datei)).contains("Studio Beispiel"));
+    }
+
+    @Test
     void kennungAusBeschriftung() {
         assertEquals("BT-34-1", RechnungOds.kennung("BT-34-1 Schema"));
         assertEquals("BT-1", RechnungOds.kennung("  BT-1 Rechnungsnummer"));
