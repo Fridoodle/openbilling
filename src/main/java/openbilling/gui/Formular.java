@@ -75,6 +75,13 @@ final class Formular extends JPanel implements Scrollable {
     private static final int POS = 0, TEXT = 1, MENGE = 2, EINHEIT = 3, PREIS = 4, STEUER = 5, BETRAG_SPALTE = 6,
             BASIS = 7, BESCHREIBUNG = 8;
 
+    /**
+     * Felder, ohne die keine gültige XRechnung entsteht: Pflicht im Rechnungsmodell (RechnungOds) oder für den
+     * Verkäuferkontakt nach BR-DE-5/6/7. Die E-Mail des Empfängers vertritt seine E-Rechnungs-Adresse (BT-49).
+     */
+    private static final Set<String> PFLICHT = Set.of("BT-1", "BT-2", "BT-10", "BT-27", "BT-37", "BT-38",
+            "BT-40", "BT-41", "BT-42", "BT-43", "BT-44", "BT-52", "BT-53", "BT-55", "BT-58", "BT-84");
+
     private final Map<String, JTextComponent> felder = new LinkedHashMap<>();
     private final Map<String, String> namen = new HashMap<>();
     private final DefaultTableModel positionen = new DefaultTableModel(
@@ -100,7 +107,9 @@ final class Formular extends JPanel implements Scrollable {
         super(new GridBagLayout());
         setBorder(BorderFactory.createEmptyBorder(24, 32, 32, 32));
 
-        JPanel kopf = abschnitt("Rechnung", null);
+        JLabel hinweis = gedaempft(new JLabel("* Pflichtfeld"));
+        hinweis.putClientProperty("FlatLaf.styleClass", "small");
+        JPanel kopf = abschnitt("Rechnung", hinweis);
         kopf.add(zeile(feld("BT-1", "Rechnungsnummer", "Rechnung"), 3, feld("BT-2", "Rechnungsdatum", "Rechnung"), 2,
                 feld("BT-9", "Fällig am", "Rechnung"), 2, feld("BT-10", "Käuferreferenz / Leitweg-ID", "Rechnung"), 2));
         kopf.add(zeile(feld("BT-72", "Leistungsdatum", "Rechnung"), 3,
@@ -220,7 +229,7 @@ final class Formular extends JPanel implements Scrollable {
         });
         felder.put(bt, f);
         namen.put(bt, gruppe + " – " + beschriftung);
-        JLabel l = new JLabel(beschriftung);
+        JLabel l = new JLabel(PFLICHT.contains(bt) ? beschriftung + " *" : beschriftung);
         l.putClientProperty("FlatLaf.styleClass", "small");
         gedaempft(l);
         l.setLabelFor(f);

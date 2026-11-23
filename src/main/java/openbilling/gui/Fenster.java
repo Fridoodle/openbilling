@@ -8,6 +8,7 @@ import java.awt.CardLayout;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.FileDialog;
 import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
 import java.awt.Toolkit;
@@ -40,7 +41,6 @@ import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -58,7 +58,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import openbilling.config.Einstellungen;
 import openbilling.model.Rechnung;
 import openbilling.ods.Kunden;
@@ -107,6 +106,7 @@ public final class Fenster extends JFrame {
 
     Fenster(Einstellungen einstellungen) {
         this.einstellungen = einstellungen;
+        setIconImages(Symbol.bilder());
         setJMenuBar(menue());
         JScrollPane rollen = new JScrollPane(formular);
         rollen.setBorder(null);
@@ -308,9 +308,8 @@ public final class Fenster extends JFrame {
         if (!verwerfenErlaubt()) {
             return;
         }
-        JFileChooser wahl = dateiwahl("ods", "OpenDocument-Tabelle (*.ods)", null);
-        if (wahl.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            Path p = wahl.getSelectedFile().toPath();
+        Path p = dateiwahl(FileDialog.LOAD, "ods", null);
+        if (p != null) {
             versuche(() -> {
                 zeigeRechnung(RechnungOds.leseEntwurf(p), p);
                 einstellungen.setze(ORDNER, p.toAbsolutePath().getParent().toString());
@@ -323,7 +322,7 @@ public final class Fenster extends JFrame {
         Entwurf e = formular.entwurf();
         Path ziel = datei;
         if (unter || ziel == null) {
-            ziel = waehleZiel("ods", "OpenDocument-Tabelle (*.ods)", e);
+            ziel = waehleZiel("ods", e);
             if (ziel == null) {
                 return false;
             }
@@ -368,32 +367,36 @@ public final class Fenster extends JFrame {
         }
     }
 
-    private JFileChooser dateiwahl(String endung, String beschreibung, String vorschlag) {
+    /**
+     * Nativer Dateidialog des Betriebssystems (unter Windows der Explorer-Dialog) statt des Swing-Dialogs.
+     * Liefert {@code null} bei Abbruch.
+     */
+    private Path dateiwahl(int modus, String endung, String vorschlag) {
         Path ordner = datei != null ? datei.toAbsolutePath().getParent()
                 : Path.of(einstellungen.wert(ORDNER, System.getProperty("user.home")));
-        JFileChooser wahl = new JFileChooser(ordner.toFile());
-        wahl.setFileFilter(new FileNameExtensionFilter(beschreibung, endung));
-        if (vorschlag != null) {
-            wahl.setSelectedFile(ordner.resolve(vorschlag + "." + endung).toFile());
-        }
-        return wahl;
+        FileDialog d = new FileDialog(this, modus == FileDialog.LOAD ? "Öffnen" : "Speichern unter", modus);
+        d.setDirectory(ordner.toString());
+        d.setFile(vorschlag != null ? vorschlag + "." + endung : "*." + endung); // Windows: Muster wirkt als Filter
+        d.setFilenameFilter((o, name) -> name.toLowerCase().endsWith("." + endung)); // andere Systeme
+        d.setVisible(true);
+        return d.getFile() == null ? null : Path.of(d.getDirectory(), d.getFile());
     }
 
     /** Fragt nach einer Zieldatei; Vorschlag ist der Dateiname bzw. die Rechnungsnummer. */
-    private Path waehleZiel(String endung, String beschreibung, Entwurf e) {
+    private Path waehleZiel(String endung, Entwurf e) {
         String vorschlag = datei != null ? datei.getFileName().toString().replaceFirst("(?i)\\.ods$", "")
                 : dateiname(e.daten().getOrDefault("BT-1", "Rechnung"));
-        JFileChooser wahl = dateiwahl(endung, beschreibung, vorschlag);
-        if (wahl.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        Path p = dateiwahl(FileDialog.SAVE, endung, vorschlag);
+        if (p == null) {
             return null;
         }
-        Path p = wahl.getSelectedFile().toPath();
+        // Überschreiben fragt der native Dialog selbst ab, aber nur für den Namen, so wie er eingegeben wurde
         if (!p.getFileName().toString().toLowerCase().endsWith("." + endung)) {
             p = p.resolveSibling(p.getFileName() + "." + endung);
-        }
-        if (Files.exists(p) && !bestaetigt(p.getFileName() + " gibt es schon. Ersetzen?"
-                + (endung.equals("pdf") ? "\nEine bereits versendete Rechnung darf nicht verändert werden." : ""))) {
-            return null;
+            if (Files.exists(p) && !bestaetigt(p.getFileName() + " gibt es schon. Ersetzen?"
+                    + (endung.equals("pdf") ? "\nEine bereits versendete Rechnung darf nicht verändert werden." : ""))) {
+                return null;
+            }
         }
         Path ordner = p.toAbsolutePath().getParent();
         versuche(() -> einstellungen.setze(ORDNER, ordner.toString()));
@@ -442,7 +445,7 @@ public final class Fenster extends JFrame {
             return m.isEmpty() ? (Object) (mitXRechnung ? PdfExport.hybrid(xml) : PdfExport.sicht(xml)) : m;
         }, ergebnis -> {
             if (ergebnis instanceof byte[] pdf) {
-                Path ziel = waehleZiel("pdf", "PDF (*.pdf)", e);
+                Path ziel = waehleZiel("pdf", e);
                 if (ziel != null && versuche(() -> Files.write(ziel, pdf))) {
                     melde("Exportiert: " + ziel + (mitXRechnung ? " (PDF/A-3 mit XRechnung)" : " (ohne XRechnung)"));
                     Object[] wahl = {"PDF öffnen", "Schließen"};

@@ -84,3 +84,9 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Symptom:** Ein Agent kann das Fenster nicht ansehen, ohne es auf dem Bildschirm des Nutzers zu öffnen.
 - **Lösung:** Fenster erzeugen, `addNotify()`, `setSize(…)`, `validate()`, dann `getRootPane().paint(…)` in ein `BufferedImage` und als PNG speichern. Die Menüleiste ist dabei, die Titelzeile des Betriebssystems nicht. Als Einstellungsordner einen temporären Ordner übergeben (`new Einstellungen(tmp)`), damit `%APPDATA%` unberührt bleibt.
 - **Quelle:** 2026-11-23.
+
+## Nativer Dateidialog statt `JFileChooser` (Windows)
+
+- **Symptom:** Der Swing-Dialog `JFileChooser` sieht unter Windows fremd aus und kennt weder Schnellzugriff noch Explorer-Suche. Nutzer wünschen den gewohnten Windows-Dialog.
+- **Lösung:** `java.awt.FileDialog` öffnet den Dialog des Betriebssystems und braucht keine Bibliothek. Zwei Eigenheiten unter Windows: `setFilenameFilter` wird ignoriert, als Filter wirkt stattdessen ein Muster in `setFile("*.ods")`. Im Modus `SAVE` fragt der Dialog selbst nach, bevor er eine vorhandene Datei überschreibt, aber nur für den Namen, wie er eingegeben wurde. Hängt das Programm die Endung danach selbst an, muss es selbst nachfragen (`Fenster.waehleZiel`).
+- **Quelle:** 2026-11-23, Windows 11, JDK 21.
