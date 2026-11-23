@@ -346,6 +346,7 @@ public final class Fenster extends JFrame {
         versuche(() -> {
             Entwurf e = RechnungOds.leseEntwurf(einstellungen.vorlagen().resolve(name + ".ods"));
             e.daten().putIfAbsent("BT-2", LocalDate.now().format(DatumFeld.FORMAT));
+            e.daten().putIfAbsent("BT-1", einstellungen.naechsteNummer(LocalDate.now()));
             zeigeRechnung(e, null);
             vorlage = name;
         });
@@ -534,6 +535,9 @@ public final class Fenster extends JFrame {
             if (ergebnis instanceof byte[] pdf) {
                 Path ziel = waehleZiel("pdf", e);
                 if (ziel != null && versuche(() -> Files.write(ziel, pdf))) {
+                    if (mitXRechnung) { // nur die echte Rechnung zählt für den Nummernvorschlag
+                        versuche(() -> einstellungen.merkeNummer(r.nummer()));
+                    }
                     melde("Exportiert: " + ziel + (mitXRechnung ? " (PDF/A-3 mit XRechnung)" : " (ohne XRechnung)"));
                     Object[] wahl = {"PDF öffnen", "Schließen"};
                     if (JOptionPane.showOptionDialog(this, "Gespeichert: " + ziel, "Export",
