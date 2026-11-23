@@ -10,6 +10,7 @@ import openbilling.model.Berechnung;
 import openbilling.model.Rechnung;
 import openbilling.model.Rechnung.Partei;
 import openbilling.model.Rechnung.Position;
+import openbilling.model.Rechnung.Zahlung;
 
 /**
  * Sichtkopie als XSL-FO: ein kompakter Geschäftsbrief für Menschen. Technische Angaben
@@ -76,12 +77,24 @@ final class Layout {
         var rechts = new StringBuilder();
         paar(rechts, "USt-IdNr.", v.ustId());
         paar(rechts, "Steuernummer", v.steuernummer());
-        if (r.zahlung() != null) {
-            paar(rechts, "IBAN", iban(r.zahlung().iban()));
-            paar(rechts, "BIC", r.zahlung().bic());
-            paar(rechts, "Inhaber", r.zahlung().kontoinhaber());
-            if (!r.nummer().equals(r.zahlung().verwendungszweck())) {
-                paar(rechts, "Verwendungszweck", r.zahlung().verwendungszweck());
+        Zahlung z = r.zahlung();
+        if (z != null) {
+            if (z.istUeberweisung()) {
+                paar(rechts, "IBAN", iban(z.iban()));
+                paar(rechts, "BIC", z.bic());
+                paar(rechts, "Inhaber", z.kontoinhaber());
+            } else {
+                paar(rechts, "Zahlungsart", zahlungsart(z));
+            }
+            if (z.istLastschrift() && z.lastschrift() != null) {
+                paar(rechts, "Mandatsreferenz", z.lastschrift().mandat());
+                paar(rechts, "Gläubiger-ID", z.lastschrift().glaeubigerId());
+            }
+            if (z.istKarte() && z.karte() != null) {
+                paar(rechts, "Karte", "endet auf " + z.karte().nummer());
+            }
+            if (!r.nummer().equals(z.verwendungszweck())) {
+                paar(rechts, "Verwendungszweck", z.verwendungszweck());
             }
         }
         s.append("<fo:block space-before=\"8mm\"/>\n");
@@ -165,7 +178,13 @@ final class Layout {
                     + prozent + " Skonto (" + geld(abzug, w) + "), Sie zahlen dann " + geld(e.zahlbar().subtract(abzug), w)
                     + ".";
         }
-        for (String text : new String[] {r.befreiungsgrund(), r.zahlungsbedingungen(), skonto}) {
+        String einzug = null; // Vorabankündigung (Pre-Notification) der SEPA-Lastschrift
+        if (z != null && z.istLastschrift() && z.lastschrift() != null) {
+            einzug = "Den Betrag von " + geld(e.zahlbar(), w) + " ziehen wir "
+                    + (r.faelligAm() != null ? "am " + datum(r.faelligAm()) : "zum Fälligkeitstermin")
+                    + " per SEPA-Lastschrift von Ihrem Konto " + verdeckt(z.lastschrift().iban()) + " ein.";
+        }
+        for (String text : new String[] {r.befreiungsgrund(), r.zahlungsbedingungen(), einzug, skonto}) {
             if (!leer(text)) {
                 s.append("<fo:block space-before=\"6mm\" linefeed-treatment=\"preserve\">").append(x(text))
                         .append("</fo:block>\n");
@@ -252,6 +271,30 @@ final class Layout {
 
     private static String iban(String iban) {
         return leer(iban) ? null : iban.replaceAll("\\s", "").replaceAll("(.{4})(?=.)", "$1 ");
+    }
+
+    /** IBAN des Kunden nur mit Länderkennung und den letzten vier Stellen, wie auf Kontoauszügen üblich. */
+    private static String verdeckt(String iban) {
+        String i = nichtNull(iban).replaceAll("\\s", "");
+        return i.length() < 8 ? i : i.substring(0, 4) + " … " + i.substring(i.length() - 4);
+    }
+
+    /** BT-82, sonst Klartext zu BT-81 (UNTDID 4461), sonst der Code selbst. */
+    private static String zahlungsart(Zahlung z) {
+        if (!leer(z.text())) {
+            return z.text();
+        }
+        return switch (nichtNull(z.art())) {
+            case "59" -> "SEPA-Lastschrift";
+            case "48" -> "Bankkarte";
+            case "54" -> "Kreditkarte";
+            case "55" -> "Debitkarte";
+            case "10" -> "Barzahlung";
+            case "68" -> "Online-Zahlungsdienst";
+            case "57" -> "Dauerauftrag";
+            case "1", "ZZZ" -> null;
+            default -> z.art();
+        };
     }
 
     /** Klartext für die häufigsten Codes aus UN/ECE Rec 20 (BT-130), sonst der Code selbst. */
