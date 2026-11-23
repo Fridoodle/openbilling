@@ -3,12 +3,12 @@ package openbilling.gui;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
+import com.formdev.flatlaf.util.SystemFileChooser;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
-import java.awt.FileDialog;
 import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
 import java.awt.Toolkit;
@@ -313,7 +313,7 @@ public final class Fenster extends JFrame {
         if (!verwerfenErlaubt()) {
             return;
         }
-        Path p = dateiwahl(FileDialog.LOAD, "ods", null);
+        Path p = dateiwahl(false, "ods", null);
         if (p != null) {
             versuche(() -> {
                 zeigeRechnung(RechnungOds.leseEntwurf(p), p);
@@ -393,25 +393,29 @@ public final class Fenster extends JFrame {
     }
 
     /**
-     * Nativer Dateidialog des Betriebssystems (unter Windows der Explorer-Dialog) statt des Swing-Dialogs.
+     * Moderner Explorer-Dialog von Windows (bzw. der native Dialog unter macOS/Linux) über FlatLafs
+     * {@link SystemFileChooser}; {@code java.awt.FileDialog} zeigt unter Windows nur den alten Dialog.
      * Liefert {@code null} bei Abbruch.
      */
-    private Path dateiwahl(int modus, String endung, String vorschlag) {
+    private Path dateiwahl(boolean speichern, String endung, String vorschlag) {
         Path ordner = datei != null ? datei.toAbsolutePath().getParent()
                 : Path.of(einstellungen.wert(ORDNER, System.getProperty("user.home")));
-        FileDialog d = new FileDialog(this, modus == FileDialog.LOAD ? "Öffnen" : "Speichern unter", modus);
-        d.setDirectory(ordner.toString());
-        d.setFile(vorschlag != null ? vorschlag + "." + endung : "*." + endung); // Windows: Muster wirkt als Filter
-        d.setFilenameFilter((o, name) -> name.toLowerCase().endsWith("." + endung)); // andere Systeme
-        d.setVisible(true);
-        return d.getFile() == null ? null : Path.of(d.getDirectory(), d.getFile());
+        SystemFileChooser d = new SystemFileChooser(ordner.toFile());
+        d.setFileFilter(new SystemFileChooser.FileNameExtensionFilter(
+                endung.equals("pdf") ? "PDF-Dokument" : "OpenDocument-Tabelle", endung));
+        d.putPlatformProperty(SystemFileChooser.WINDOWS_DEFAULT_EXTENSION, endung);
+        if (vorschlag != null) {
+            d.setSelectedFile(ordner.resolve(vorschlag + "." + endung).toFile());
+        }
+        int r = speichern ? d.showSaveDialog(this) : d.showOpenDialog(this);
+        return r == SystemFileChooser.APPROVE_OPTION ? d.getSelectedFile().toPath() : null;
     }
 
     /** Fragt nach einer Zieldatei; Vorschlag ist der Dateiname bzw. die Rechnungsnummer. */
     private Path waehleZiel(String endung, Entwurf e) {
         String vorschlag = datei != null ? datei.getFileName().toString().replaceFirst("(?i)\\.ods$", "")
                 : dateiname(e.daten().getOrDefault("BT-1", "Rechnung"));
-        Path p = dateiwahl(FileDialog.SAVE, endung, vorschlag);
+        Path p = dateiwahl(true, endung, vorschlag);
         if (p == null) {
             return null;
         }

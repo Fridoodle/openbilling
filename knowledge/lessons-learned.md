@@ -89,7 +89,8 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 ## Nativer Dateidialog statt `JFileChooser` (Windows)
 
 - **Symptom:** Der Swing-Dialog `JFileChooser` sieht unter Windows fremd aus und kennt weder Schnellzugriff noch Explorer-Suche. Nutzer wünschen den gewohnten Windows-Dialog.
-- **Lösung:** `java.awt.FileDialog` öffnet den Dialog des Betriebssystems und braucht keine Bibliothek. Zwei Eigenheiten unter Windows: `setFilenameFilter` wird ignoriert, als Filter wirkt stattdessen ein Muster in `setFile("*.ods")`. Im Modus `SAVE` fragt der Dialog selbst nach, bevor er eine vorhandene Datei überschreibt, aber nur für den Namen, wie er eingegeben wurde. Hängt das Programm die Endung danach selbst an, muss es selbst nachfragen (`Fenster.waehleZiel`).
+- **Irrweg:** `java.awt.FileDialog` öffnet unter Windows nur den alten, kleinen Common-Dialog (ohne Navigationsbereich, Adressleiste und Suche), weil AWT ihn mit einem Hook aufruft. Nutzer empfinden ihn als „Mini-Fenster“.
+- **Lösung:** `com.formdev.flatlaf.util.SystemFileChooser` (FlatLaf ab 3.6, also schon vorhanden) zeigt den modernen Explorer-Dialog (`IFileDialog`) und unter macOS/Linux den jeweiligen Systemdialog. Die API ähnelt `JFileChooser`. Die nötigen DLLs stecken im FlatLaf-JAR. Mit `putPlatformProperty(WINDOWS_DEFAULT_EXTENSION, "ods")` hängt Windows die Endung selbst an und fragt beim Überschreiben korrekt nach. `Fenster.waehleZiel` prüft trotzdem weiter selbst, falls die Endung fehlt.
 - **Quelle:** 2026-11-23, Windows 11, JDK 21.
 
 ## FOP direkt benutzen: Konfiguration und Seitenzahl
