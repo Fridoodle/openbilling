@@ -2,6 +2,27 @@
 
 Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · Lösung · Quelle/Commit.
 
+## Maven unter PowerShell: `-D`-Argumente mit Punkt quoten
+
+- **Symptom:** `Unknown lifecycle phase ".txt"` bei `mvn dependency:tree -DoutputFile=out\deps.txt`.
+- **Ursache:** PowerShell zerlegt ein ungequotetes Argument der Form `-Dname=wert.endung` am Punkt.
+- **Lösung:** `-D`-Argumente in einfache Anführungszeichen setzen: `mvn test '-Dtest=FacturXSpikeTest'`.
+- **Quelle:** Windows PowerShell 5.1, 2026-11-23.
+
+## Nur JRE installiert: Maven kann nicht kompilieren
+
+- **Symptom:** `mvn -version` läuft, zeigt aber `runtime: …\jre-21…`; `javac` fehlt.
+- **Ursache:** `EclipseAdoptium.Temurin.21.JRE` enthält keinen Compiler.
+- **Lösung:** `winget install EclipseAdoptium.Temurin.21.JDK`. Der Installer setzt `JAVA_HOME` systemweit; in einer schon offenen Shell `$env:JAVA_HOME` selbst setzen oder die Shell neu starten.
+- **Quelle:** 2026-11-23.
+
+## Mustang: Hinweis „No SLF4J providers were found“
+
+- **Symptom:** Beim Test erscheinen SLF4J-Warnungen auf stderr.
+- **Ursache:** Mustang nutzt die SLF4J-API, ohne eine Implementierung mitzubringen.
+- **Lösung:** Harmlos, Logging ist dann aus. Nur wenn Mustang-Logs gebraucht werden, `org.slf4j:slf4j-simple` als Abhängigkeit ergänzen.
+- **Quelle:** Mustang 2.26.0, 2026-11-23.
+
 ## KoSIT-Validator: `..` im Repository-Pfad
 
 - **Symptom:** `IllegalStateException: Can not resolve resources/ubl/2.1/xsd/maindoc/UBL-Invoice-2.1.xsd in repository …/scripts/../tools/kosit/config/`, obwohl die Datei existiert.

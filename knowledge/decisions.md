@@ -37,6 +37,14 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Kontext:** LibreOffice headless wäre eine schwere Laufzeitabhängigkeit, seine PDF/A-Optionen sind unverifiziert, und das Ergebnis sähe aus wie eine Tabelle.
 - **Entscheidung:** Rechnungsmodell → HTML-Vorlage → PDF/A-3b (openhtmltopdf, Schriften eingebettet) → Mustang bettet `xrechnung.xml` ein. Die XML wird zusätzlich separat ausgegeben. Falls schneller, dient in einer ersten Phase Mustangs eingebaute Visualisierung als Übergang (ob sie direkt PDF/A-3 liefert und anpassbar ist, ist unverifiziert).
 - **Konsequenzen:** PDF und XML entstehen aus demselben Modell und können nicht voneinander abweichen. LibreOffice wird nur noch zum Bearbeiten der ODS gebraucht.
+- **Nachtrag 2026-11-23 (Spike):** Der Übergangsweg funktioniert. Mustangs Visualisierung (XML → PDF über FOP) und die anschließende Einbettung ergeben ein laut veraPDF PDF/A-3u-konformes Hybrid-PDF. Phase 1 nutzt deshalb diesen Weg. Ein eigenes HTML-Layout mit openhtmltopdf kommt erst, wenn Logo oder Gestaltung angepasst werden sollen. Wie weit sich Mustangs Layout anpassen lässt, ist noch (unverifiziert).
+
+## 2026-11-23 — Abhängigkeiten des Maven-Grundgerüsts
+
+- **`org.mustangproject:library` 2.26.0** (compile): erzeugt das PDF und bettet die XRechnung ein (siehe oben). Die Bibliothek ist schwer, denn sie zieht unter anderem Apache FOP, Batik, Saxon-HE, PDFBox und die ph-cii/ph-ubl-Bibliotheken mit. Das ist der Preis dafür, Factur-X nicht selbst zu bauen. PDFBox ist damit schon vorhanden und kann direkt genutzt werden.
+- **`org.mustangproject:validator` 2.26.0** (nur test): prüft im Test PDF/A-3 mit veraPDF und die eingebettete XML.
+- **JUnit 6.1.3** (nur test, über `junit-bom`).
+- **Maven 3.9.16** wird nicht systemweit installiert, sondern per `scripts/setup-maven.ps1` nach `tools/maven/` geladen (SHA-512 geprüft), weil winget kein offizielles Maven-Paket hat.
 
 ## 2026-11-23 — Formatprüfung mit dem offiziellen KoSIT-Validator
 

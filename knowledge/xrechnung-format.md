@@ -328,11 +328,11 @@ Testdaten: `xrechnung-testsuite` (Mirror auf GitHub, Original auf projekte.kosit
 | Punkt | Wert |
 |---|---|
 | PDF-Standard | **PDF/A-3** (a, b oder u; in der Praxis meist PDF/A-3b) |
-| Dateiname des Anhangs | `factur-x.xml`; **beim Profil XRECHNUNG `xrechnung.xml`** (laut Fremdquellen, unverifiziert gegen die FeRD-Spezifikation) |
-| Einbettung | `/EmbeddedFiles` und **`/AF`-Array im Catalog** mit Filespec `/AFRelationship` |
-| AFRelationship | `/Alternative` (DE-Empfehlung für EN 16931, EXTENDED und XRECHNUNG), `/Data` (MINIMUM und BASIC WL sowie französische Vorgabe), `/Source`. Die Zuordnung pro Profil ist (unverifiziert). |
-| MIME-Typ | `text/xml` (Subtype `/text#2Fxml`) |
-| XMP-Metadaten | PDF/A-Extension-Schema mit Namespace `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` (Präfix `fx`). Felder: `fx:DocumentType=INVOICE`, `fx:DocumentFileName=xrechnung.xml` bzw. `factur-x.xml`, `fx:Version=1.0`, `fx:ConformanceLevel=XRECHNUNG` bzw. `EN 16931`. Die ConformanceLevel muss zum XML passen. Namespace und Werte (unverifiziert) |
+| Dateiname des Anhangs | `factur-x.xml`; **beim Profil XRECHNUNG `xrechnung.xml`**. So erzeugt es Mustang 2.26.0 mit Profil `XRECHNUNG`, und Mustangs Validator akzeptiert es (geprüft 23.11.2026, `FacturXSpikeTest`). Gegen den Text der FeRD-Spezifikation selbst noch nicht gelesen. |
+| Einbettung | `/EmbeddedFiles` und **`/AF`-Array im Catalog** mit Filespec `/AFRelationship` (von Mustang so erzeugt, geprüft) |
+| AFRelationship | `/Alternative` (DE-Empfehlung für EN 16931, EXTENDED und XRECHNUNG; Mustang setzt beim Profil XRECHNUNG `Alternative`, geprüft), `/Data` (MINIMUM und BASIC WL sowie französische Vorgabe), `/Source`. Die Zuordnung für die anderen Profile ist (unverifiziert). |
+| MIME-Typ | `text/xml` (Subtype `/text#2Fxml`, von Mustang so erzeugt, geprüft) |
+| XMP-Metadaten | PDF/A-Extension-Schema mit Namespace `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` (Präfix `fx`). Felder: `fx:DocumentType=INVOICE`, `fx:DocumentFileName=xrechnung.xml` bzw. `factur-x.xml`, `fx:Version=1.0`, `fx:ConformanceLevel=XRECHNUNG` bzw. `EN 16931`. Die ConformanceLevel muss zum XML passen. Für XRECHNUNG genau so von Mustang 2.26.0 erzeugt und von veraPDF (PDF/A-3u) akzeptiert. |
 | Anzahl | genau **ein** Rechnungs-XML. Weitere Anhänge sind erlaubt. |
 
 ### Werkzeuge
@@ -343,7 +343,8 @@ Testdaten: `xrechnung-testsuite` (Mirror auf GitHub, Original auf projekte.kosit
 | XML einbetten (Python) | **factur-x** (Akretion, PyPI `factur-x`, v7.10 vom 19.11.2026): `facturx.generate_from_file(pdf, xml, output_pdf_file=..., afrelationship='alternative', attachments={...})`; CLI `facturx-pdfgen`, `facturx-xmlcheck`, `facturx-pdfextractxml` | Das Ergebnis ist nur dann PDF/A-3-konform, wenn das Eingabe-PDF schon PDF/A ist. Den eingebetteten Dateinamen und die XMP-ConformanceLevel für XRECHNUNG vorher prüfen (unverifiziert). |
 | CII erzeugen (Python) | **drafthorse** (pretix): Datenmodell nach ZUGFeRD, `drafthorse.pdf.attach_xml()` | Profilunterstützung XRECHNUNG (unverifiziert) |
 | Low-Level-PDF (Python) | **pikepdf** (qpdf): `/AF`, `/EmbeddedFiles`, XMP via `pdf.open_metadata()` | als Fallback oder für eine eigene Implementierung |
-| Java | **Mustangproject** 2.26.0 (25.08.2026, `org.mustangproject:library`): ZUGFeRD 2.5 und CII-XRechnung 3.0.2, PDF/A-1→A-3, Mustang-CLI `--action combine` / `--action validate` | CLI-Flags (unverifiziert) |
+| Java | **Mustangproject** 2.26.0 (25.08.2026, `org.mustangproject:library`): ZUGFeRD 2.5 und CII-XRechnung 3.0.2, PDF/A-1→A-3, Mustang-CLI `--action combine` / `--action validate` | **In openbilling verwendet.** Geprüfter Ablauf (23.11.2026): `new ZUGFeRDVisualizer().toPDF(xml, pdf, Language.DE)` erzeugt per FOP eine Sichtkopie, die sich als PDF/A-3b ausweist, aber noch kein `/AF` hat. Danach `new ZUGFeRDExporterFromPDFA().load(pdf).setProfile(Profiles.getByName("XRECHNUNG")).setXML(bytes)` und `export(ziel)`. Das Ergebnis ist laut veraPDF (über `org.mustangproject:validator`) **PDF/A-3u-konform**, die eingebettete XML ist beim KoSIT-Validator ACCEPTABLE. Siehe `src/test/java/openbilling/FacturXSpikeTest.java`. CLI-Flags weiter (unverifiziert). |
+| PDF/A + XML prüfen (Java) | `org.mustangproject:validator` 2.26.0: `new ZUGFeRDValidator().validate(pfad)` liefert einen XML-Bericht, `wasCompletelyValid()` das Ergebnis. Enthält veraPDF und die XRechnung-Schematron. | nur als Test-Abhängigkeit eingebunden |
 | PDF/A prüfen | veraPDF (`verapdf --flavour 3b datei.pdf`) | (unverifiziert, Flag) |
 
 **Empfohlene Pipeline:** Zuerst das ODS anlegen. Dann (1) das Datenmodell nach BT-Nummern aus dem ODS lesen und (2) CII-XML erzeugen. (3) Das XML mit dem KoSIT-Validator prüfen (nur `accept`). (4) Das ODS mit LibreOffice in PDF/A-3b umwandeln. (5) Das XML mit factur-x oder pikepdf als `xrechnung.xml` einbetten (AFRelationship `Alternative`, XMP ConformanceLevel `XRECHNUNG`). (6) Optional mit veraPDF und dem Mustang-Validator gegenprüfen. **Zusätzlich das XML separat ausgeben**, denn Behördenportale verlangen meist die reine XML-Datei.
