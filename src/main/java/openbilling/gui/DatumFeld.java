@@ -1,9 +1,9 @@
 package openbilling.gui;
 
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
@@ -18,7 +18,6 @@ import java.time.format.TextStyle;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -77,7 +76,7 @@ final class DatumFeld extends JTextField {
     private void zeigeKalender() {
         JPopupMenu popup = new JPopupMenu();
         JPanel inhalt = new JPanel(new BorderLayout(0, 6));
-        inhalt.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        inhalt.setBorder(Formular.rand(8, 8, 8, 8));
         popup.add(inhalt);
         LocalDate gewaehlt = lese(getText());
         fuelle(inhalt, popup, YearMonth.from(gewaehlt != null ? gewaehlt : LocalDate.now()), gewaehlt);
@@ -88,7 +87,7 @@ final class DatumFeld extends JTextField {
         inhalt.removeAll();
         JLabel titel = new JLabel(monat.getMonth().getDisplayName(TextStyle.FULL_STANDALONE, Locale.GERMAN)
                 + " " + monat.getYear(), SwingConstants.CENTER);
-        titel.setFont(titel.getFont().deriveFont(Font.BOLD));
+        titel.putClientProperty("FlatLaf.style", "font: bold");
         JPanel kopf = new JPanel(new BorderLayout());
         kopf.add(flach("‹", () -> fuelle(inhalt, popup, monat.minusMonths(1), gewaehlt)), BorderLayout.WEST);
         kopf.add(titel);
@@ -115,7 +114,7 @@ final class DatumFeld extends JTextField {
                 b.putClientProperty("JButton.buttonType", null); // als normaler Knopf sichtbar hervorgehoben
             }
             if (tag.equals(heute)) {
-                b.setFont(b.getFont().deriveFont(Font.BOLD));
+                b.putClientProperty("FlatLaf.style", "font: bold");
             }
             tage.add(b);
         }
@@ -148,21 +147,23 @@ final class DatumFeld extends JTextField {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             Color farbe = UIManager.getColor("Label.disabledForeground");
             g2.setColor(farbe != null ? farbe : Color.GRAY);
-            g2.drawRoundRect(x + 1, y + 2, 13, 12, 3, 3);
-            g2.drawLine(x + 1, y + 6, x + 14, y + 6);
-            g2.drawLine(x + 5, y, x + 5, y + 3);
-            g2.drawLine(x + 10, y, x + 10, y + 3);
+            g2.translate(x, y);
+            UIScale.scaleGraphics(g2); // wächst mit der Schriftgröße
+            g2.drawRoundRect(1, 2, 13, 12, 3, 3);
+            g2.drawLine(1, 6, 14, 6);
+            g2.drawLine(5, 0, 5, 3);
+            g2.drawLine(10, 0, 10, 3);
             g2.dispose();
         }
 
         @Override
         public int getIconWidth() {
-            return 16;
+            return UIScale.scale(16);
         }
 
         @Override
         public int getIconHeight() {
-            return 16;
+            return UIScale.scale(16);
         }
     }
 }

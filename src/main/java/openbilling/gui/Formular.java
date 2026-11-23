@@ -1,9 +1,9 @@
 package openbilling.gui;
 
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultCellEditor;
@@ -39,6 +38,8 @@ import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -97,7 +98,20 @@ final class Formular extends JPanel implements Scrollable {
             return spalte != BETRAG_SPALTE;
         }
     };
-    private final JTable tabelle = new JTable(positionen);
+    /** Schmalste Breite des Inhalts bei normaler Größe; bei Zoom hochgerechnet. */
+    private static final int SCHMAL = 720;
+    private final JTable tabelle = new JTable(positionen) {
+        @Override
+        public void updateUI() { // Zeilenhöhe und Spaltenbreiten wachsen mit der Schriftgröße
+            super.updateUI();
+            setRowHeight(UIScale.scale(30));
+            if (spaltenBreiten != null) { // null, solange der Konstruktor von JTable läuft
+                spaltenBreiten.forEach((spalte, breite) -> spalte.setPreferredWidth(UIScale.scale(breite)));
+            }
+        }
+    };
+    /** Spaltenbreiten der Positionstabelle bei normaler Größe. */
+    private final Map<javax.swing.table.TableColumn, Integer> spaltenBreiten = new HashMap<>();
     private final JLabel netto = new JLabel();
     private final JLabel steuer = new JLabel();
     private final JLabel gesamt = new JLabel();
@@ -111,7 +125,7 @@ final class Formular extends JPanel implements Scrollable {
 
     Formular(Runnable ausAdressbuch, Runnable insAdressbuch) {
         super(new GridBagLayout());
-        setBorder(BorderFactory.createEmptyBorder(24, 32, 32, 32));
+        setBorder(rand(24, 32, 32, 32));
 
         JLabel hinweis = gedaempft(new JLabel("* Pflichtfeld"));
         hinweis.putClientProperty("FlatLaf.styleClass", "small");
@@ -202,7 +216,8 @@ final class Formular extends JPanel implements Scrollable {
         JPanel rahmen = new JPanel(new BorderLayout()) {
             @Override
             public Dimension getPreferredSize() {
-                return new Dimension(Math.min(1080, Math.max(680, Formular.this.getWidth() - 64)),
+                // Breite des Sichtbereichs, aber mindestens SCHMAL (sonst rollt die Seite waagrecht, siehe unten)
+                return new Dimension(Math.min(UIScale.scale(1080), Math.max(UIScale.scale(SCHMAL), platz())),
                         super.getPreferredSize().height);
             }
         };
@@ -234,15 +249,23 @@ final class Formular extends JPanel implements Scrollable {
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         JLabel l = new JLabel(titel);
         l.putClientProperty("FlatLaf.styleClass", "h3");
-        JPanel kopf = new JPanel(new BorderLayout());
+        JPanel kopf = new JPanel(new BorderLayout()) {
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(10, UIScale.scale(30));
+            }
+
+            @Override
+            public Dimension getMaximumSize() {
+                return new Dimension(Integer.MAX_VALUE, UIScale.scale(30));
+            }
+        };
         kopf.add(l, BorderLayout.WEST);
         if (rechts != null) {
             kopf.add(rechts, BorderLayout.EAST);
         }
-        kopf.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+        kopf.setBorder(rand(0, 0, 6, 0));
         kopf.setAlignmentX(LEFT_ALIGNMENT);
-        kopf.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        kopf.setPreferredSize(new Dimension(10, 30));
         p.add(kopf);
         return p;
     }
@@ -305,6 +328,25 @@ final class Formular extends JPanel implements Scrollable {
         return s;
     }
 
+    /**
+     * Leerer Rand, der mit der Schriftgröße (Zoom) wächst. Nicht {@code FlatEmptyBorder}: das ist eine UIResource,
+     * und {@code updateUI()} beim Wechsel von Design oder Größe würde ihn entfernen.
+     */
+    static Border rand(int oben, int links, int unten, int rechts) {
+        return new EmptyBorder(oben, links, unten, rechts) {
+            @Override
+            public Insets getBorderInsets(java.awt.Component c, Insets i) {
+                i.set(UIScale.scale(top), UIScale.scale(left), UIScale.scale(bottom), UIScale.scale(right));
+                return i;
+            }
+
+            @Override
+            public Insets getBorderInsets() {
+                return getBorderInsets(null, new Insets(0, 0, 0, 0));
+            }
+        };
+    }
+
     /** Zurückhaltende Textfarbe, die beim Wechsel des Designs mitgeht. */
     static JLabel gedaempft(JLabel l) {
         l.putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground");
@@ -317,7 +359,12 @@ final class Formular extends JPanel implements Scrollable {
 
     /** Felder nebeneinander: abwechselnd Komponente und relative Breite. */
     private static JPanel zeile(Object... teile) {
-        JPanel p = new JPanel(new GridBagLayout());
+        JPanel p = new JPanel(new GridBagLayout()) {
+            @Override
+            public Dimension getMaximumSize() { // nur in der Breite dehnen, Höhe folgt der Schriftgröße
+                return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+            }
+        };
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.HORIZONTAL;
         for (int i = 0; i < teile.length; i += 2) {
@@ -326,17 +373,29 @@ final class Formular extends JPanel implements Scrollable {
             p.add((JComponent) teile[i], c);
         }
         p.setAlignmentX(LEFT_ALIGNMENT);
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, p.getPreferredSize().height));
         return p;
     }
 
     /** Adressbuch-Knöpfe, beschriftet und so hoch wie ein Eingabefeld. */
     private static JComponent adressbuch(Runnable aus, Runnable ins) {
         JPanel knoepfe = new JPanel(new GridLayout(1, 2, 12, 0));
-        int hoehe = new JTextField().getPreferredSize().height;
-        for (JButton b : new JButton[] {new JButton("Aus Adressbuch wählen…"), new JButton("Im Adressbuch speichern")}) {
+        // kurze Beschriftungen, „Adressbuch“ steht schon darüber; so passen sie auch bei großer Schrift ganz hinein
+        String[][] knopf = {{"Auswählen…", "Empfänger aus dem Adressbuch übernehmen"},
+                {"Speichern", "Diesen Empfänger im Adressbuch speichern"}};
+        for (String[] k : knopf) {
+            JButton b = new JButton(k[0]) {
+                @Override
+                public Dimension getPreferredSize() {
+                    return new Dimension(10, new JTextField().getPreferredSize().height);
+                }
+
+                @Override
+                public Dimension getMinimumSize() { // Breite gibt das Raster vor, nicht der Text
+                    return getPreferredSize();
+                }
+            };
+            b.setToolTipText(k[1]);
             b.setFocusable(false);
-            b.setPreferredSize(new Dimension(10, hoehe));
             knoepfe.add(b);
         }
         ((JButton) knoepfe.getComponent(0)).addActionListener(e -> aus.run());
@@ -350,7 +409,6 @@ final class Formular extends JPanel implements Scrollable {
     }
 
     private JComponent positionsteil() {
-        tabelle.setRowHeight(30);
         tabelle.setShowHorizontalLines(true);
         tabelle.setFillsViewportHeight(true);
         tabelle.putClientProperty("terminateEditOnFocusLost", true);
@@ -360,7 +418,7 @@ final class Formular extends JPanel implements Scrollable {
         tabelle.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         int[] breiten = {44, 420, 70, 100, 110, 150, 110};
         for (int i = 0; i < breiten.length; i++) {
-            tabelle.getColumnModel().getColumn(i).setPreferredWidth(breiten[i]);
+            spaltenBreiten.put(tabelle.getColumnModel().getColumn(i), breiten[i]);
         }
         DefaultTableCellRenderer rechts = new DefaultTableCellRenderer();
         rechts.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -369,7 +427,8 @@ final class Formular extends JPanel implements Scrollable {
         }
         // Rabatt (BT-138) steht im Modell hinten, in der Ansicht vor dem Betrag
         var rabatt = tabelle.getColumnModel().getColumn(tabelle.convertColumnIndexToView(RABATT));
-        rabatt.setPreferredWidth(80);
+        spaltenBreiten.put(rabatt, 80);
+        spaltenBreiten.forEach((spalte, breite) -> spalte.setPreferredWidth(UIScale.scale(breite)));
         rabatt.setCellRenderer(rechts);
         tabelle.moveColumn(tabelle.convertColumnIndexToView(RABATT), tabelle.convertColumnIndexToView(BETRAG_SPALTE));
         tabelle.getColumnModel().getColumn(EINHEIT).setCellEditor(auswahl(EINHEITEN, List.of()));
@@ -418,7 +477,7 @@ final class Formular extends JPanel implements Scrollable {
         knoepfe.add(neu);
         knoepfe.add(Box.createHorizontalStrut(8));
         knoepfe.add(weg);
-        knoepfe.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        knoepfe.setBorder(rand(10, 0, 0, 0));
 
         // ausführlicher Text (BT-154) zur gerade gewählten Position
         mehrzeilig(beschreibung).setEnabled(false);
@@ -452,7 +511,7 @@ final class Formular extends JPanel implements Scrollable {
         JLabel titel = gedaempft(new JLabel("Beschreibung der gewählten Position (optional, mehrzeilig)"));
         titel.putClientProperty("FlatLaf.styleClass", "small");
         JPanel detail = new JPanel(new BorderLayout(0, 3));
-        detail.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        detail.setBorder(rand(12, 0, 0, 0));
         detail.add(titel, BorderLayout.NORTH);
         detail.add(rollbar(beschreibung));
 
@@ -479,7 +538,7 @@ final class Formular extends JPanel implements Scrollable {
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(4, 24, 4, 0);
         c.anchor = GridBagConstraints.EAST;
-        gesamt.setFont(gesamt.getFont().deriveFont(Font.BOLD, gesamt.getFont().getSize2D() + 5));
+        gesamt.putClientProperty("FlatLaf.style", "font: bold +5"); // als Stil, damit es dem Zoom folgt
         String[] texte = {"Netto", "Umsatzsteuer", "Rechnungsbetrag"};
         JLabel[] werte = {netto, steuer, gesamt};
         for (int i = 0; i < 3; i++) {
@@ -753,7 +812,7 @@ final class Formular extends JPanel implements Scrollable {
 
     @Override
     public int getScrollableUnitIncrement(Rectangle sichtbar, int richtung, int vorzeichen) {
-        return 24;
+        return UIScale.scale(24);
     }
 
     @Override
@@ -763,7 +822,15 @@ final class Formular extends JPanel implements Scrollable {
 
     @Override
     public boolean getScrollableTracksViewportWidth() {
-        return true;
+        // Bei großer Schrift in kleinem Fenster lieber waagrecht rollen, als Felder zu stauchen und Text zu kürzen
+        return platz() >= UIScale.scale(SCHMAL);
+    }
+
+    /** Breite für den Inhalt: Sichtbereich (Viewport) abzüglich Rand, nicht die eigene, evtl. breitere Größe. */
+    private int platz() {
+        Insets rand = getInsets();
+        int breite = getParent() != null ? getParent().getWidth() : getWidth();
+        return breite - rand.left - rand.right;
     }
 
     @Override

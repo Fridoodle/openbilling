@@ -4,6 +4,7 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 import com.formdev.flatlaf.util.SystemFileChooser;
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Cursor;
@@ -12,6 +13,7 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -30,13 +32,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.swing.BorderFactory;
+import javax.swing.AbstractAction;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
@@ -50,6 +54,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -75,6 +80,9 @@ import openbilling.xml.CiiSchreiber;
 public final class Fenster extends JFrame {
 
     private static final String DUNKEL = "ansicht.dunkel";
+    /** Zoomfaktor der Oberfläche (Schrift und Abstände), 1 = normal. */
+    private static final String GROESSE = "ansicht.groesse";
+    private static final float[] GROESSEN = {1f, 1.1f, 1.25f, 1.5f, 1.75f, 2f};
     private static final String ORDNER = "rechnungsordner";
     private static final Pattern BT = Pattern.compile("BT-\\d+(?:-\\d+)?");
 
@@ -96,6 +104,12 @@ public final class Fenster extends JFrame {
     /** Öffnet das Fenster; mit {@code datei} gleich diese Rechnung, sonst die Startseite. */
     public static void starte(Einstellungen einstellungen, Path datei) {
         SwingUtilities.invokeLater(() -> {
+            UIScale.setSupportedZoomFactors(GROESSEN);
+            try {
+                UIScale.setZoomFactor(Float.parseFloat(einstellungen.wert(GROESSE, "1")));
+            } catch (NumberFormatException e) {
+                // ungültiger Wert in einstellungen.properties: normale Größe
+            }
             design(Boolean.parseBoolean(einstellungen.wert(DUNKEL, "false")));
             Fenster f = new Fenster(einstellungen);
             f.setVisible(true);
@@ -118,11 +132,12 @@ public final class Fenster extends JFrame {
         this.einstellungen = einstellungen;
         setIconImages(Symbol.bilder());
         setJMenuBar(menue());
+        zoomTasten();
         JScrollPane rollen = new JScrollPane(formular);
         rollen.setBorder(null);
         inhalt.add(startseite(), "start");
         inhalt.add(rollen, "rechnung");
-        status.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+        status.setBorder(Formular.rand(6, 12, 6, 12));
         add(inhalt);
         add(status, BorderLayout.SOUTH);
         formular.beiAenderung = () -> {
@@ -139,7 +154,9 @@ public final class Fenster extends JFrame {
                 }
             }
         });
-        setSize(1180, 860);
+        // Startgröße wächst mit der Schriftgröße, höchstens bis zur Arbeitsfläche des Bildschirms
+        java.awt.Rectangle flaeche = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        setSize(Math.min(UIScale.scale(1180), flaeche.width), Math.min(UIScale.scale(860), flaeche.height));
         setMinimumSize(new Dimension(820, 560));
         setLocationRelativeTo(null);
         zeigeStart();
@@ -170,6 +187,33 @@ public final class Fenster extends JFrame {
         a.add(eintrag("Empfänger im Adressbuch speichern", 0, true, this::insAdressbuch));
 
         JMenu v = new JMenu("Ansicht");
+        JMenu groesse = new JMenu("Schriftgröße");
+        ButtonGroup gruppe = new ButtonGroup();
+        for (float f : GROESSEN) {
+            JRadioButtonMenuItem m = new JRadioButtonMenuItem(Math.round(f * 100) + " %");
+            m.addActionListener(e -> zoome(() -> UIScale.setZoomFactor(f)));
+            gruppe.add(m);
+            groesse.add(m);
+        }
+        groesse.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                for (int i = 0; i < GROESSEN.length; i++) {
+                    groesse.getItem(i).setSelected(GROESSEN[i] == UIScale.getZoomFactor());
+                }
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {}
+
+            @Override
+            public void menuCanceled(MenuEvent e) {}
+        });
+        v.add(groesse);
+        v.add(eintrag("Größer", KeyEvent.VK_PLUS, false, () -> zoome(UIScale::zoomIn)));
+        v.add(eintrag("Kleiner", KeyEvent.VK_MINUS, false, () -> zoome(UIScale::zoomOut)));
+        v.add(eintrag("Normale Größe", KeyEvent.VK_0, false, () -> zoome(UIScale::zoomReset)));
+        v.addSeparator();
         JCheckBoxMenuItem dunkel = new JCheckBoxMenuItem("Dunkles Design",
                 Boolean.parseBoolean(einstellungen.wert(DUNKEL, "false")));
         dunkel.addActionListener(e -> {
@@ -183,6 +227,35 @@ public final class Fenster extends JFrame {
         leiste.add(a);
         leiste.add(v);
         return leiste;
+    }
+
+    /**
+     * Ändert die Größe der Oberfläche. FlatLaf rechnet den Zoom beim Aufbau der UI-Defaults ein, deshalb
+     * wird das Design danach neu gesetzt.
+     */
+    private void zoome(BooleanSupplier aenderung) {
+        if (aenderung.getAsBoolean()) {
+            design(Boolean.parseBoolean(einstellungen.wert(DUNKEL, "false")));
+            versuche(() -> einstellungen.setze(GROESSE, String.valueOf(UIScale.getZoomFactor())));
+        }
+    }
+
+    /** Zweitbelegungen für Größer/Kleiner/Normal: Ziffernblock und Strg+= (US-Tastatur). */
+    private void zoomTasten() {
+        int strg = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        Map<Integer, BooleanSupplier> tasten = Map.of(KeyEvent.VK_ADD, UIScale::zoomIn,
+                KeyEvent.VK_EQUALS, UIScale::zoomIn, KeyEvent.VK_SUBTRACT, UIScale::zoomOut,
+                KeyEvent.VK_NUMPAD0, UIScale::zoomReset);
+        tasten.forEach((taste, aenderung) -> {
+            String name = "zoom" + taste;
+            getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(taste, strg), name);
+            getRootPane().getActionMap().put(name, new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    zoome(aenderung);
+                }
+            });
+        });
     }
 
     private JMenuItem eintrag(String text, int taste, boolean brauchtRechnung, Runnable aktion) {
@@ -203,11 +276,20 @@ public final class Fenster extends JFrame {
         JLabel unter = Formular.gedaempft(new JLabel("Vorlage wählen. Sie bringt Absender, Bankverbindung und"
                 + " alles Wiederkehrende mit."));
 
-        JList<String> liste = new JList<>(vorlagen);
+        JList<String> liste = new JList<>(vorlagen) {
+            @Override
+            public void updateUI() { // feste Zeilenhöhe wächst mit der Schriftgröße
+                super.updateUI();
+                setFixedCellHeight(UIScale.scale(34));
+            }
+        };
         liste.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        liste.setFixedCellHeight(34);
-        JScrollPane rollen = new JScrollPane(liste);
-        rollen.setPreferredSize(new Dimension(460, 220));
+        JScrollPane rollen = new JScrollPane(liste) {
+            @Override
+            public Dimension getPreferredSize() {
+                return UIScale.scale(new Dimension(460, 220));
+            }
+        };
 
         erstellen = new JButton("Rechnung erstellen");
         Runnable neu = () -> {
@@ -597,7 +679,7 @@ public final class Fenster extends JFrame {
         text.setLineWrap(true);
         text.setWrapStyleWord(true);
         JScrollPane rollen = new JScrollPane(text);
-        rollen.setPreferredSize(new Dimension(560, Math.min(320, 60 + 22 * probleme.size())));
+        rollen.setPreferredSize(UIScale.scale(new Dimension(560, Math.min(320, 60 + 22 * probleme.size()))));
         JPanel p = new JPanel(new BorderLayout(0, 8));
         p.add(new JLabel(ueberschrift), BorderLayout.NORTH);
         p.add(rollen);
@@ -661,7 +743,7 @@ public final class Fenster extends JFrame {
         JDialog dialog = new JDialog(this, "Adressbuch", true);
         DefaultListModel<Map<String, String>> modell = new DefaultListModel<>();
         JList<Map<String, String>> liste = new JList<>(modell);
-        liste.setFixedCellHeight(34);
+        liste.setFixedCellHeight(UIScale.scale(34));
         liste.setCellRenderer(new javax.swing.DefaultListCellRenderer() {
             @Override
             public java.awt.Component getListCellRendererComponent(JList<?> l, Object wert, int i, boolean gewaehlt,
@@ -728,7 +810,7 @@ public final class Fenster extends JFrame {
         knoepfe.add(loeschen, BorderLayout.WEST);
         knoepfe.add(nehmen, BorderLayout.EAST);
         JPanel p = new JPanel(new BorderLayout(0, 10));
-        p.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        p.setBorder(Formular.rand(16, 16, 16, 16));
         p.add(suche, BorderLayout.NORTH);
         p.add(new JScrollPane(liste));
         p.add(knoepfe, BorderLayout.SOUTH);
