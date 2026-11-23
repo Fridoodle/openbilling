@@ -1,5 +1,5 @@
 ; Inno-Setup-Skript für den Windows-Installer. Aufruf über scripts\package.ps1, das Version und App-Image übergibt:
-;   ISCC.exe /DVersion=0.1.0 /DBild=<pfad zum App-Image> packaging\openbilling.iss
+;   ISCC.exe /DVersion=0.1.0 /DBild=<pfad zum App-Image> /DSymbole=<ordner mit openbilling.ico> packaging\openbilling.iss
 ; Installiert ohne Administratorrechte nach %LOCALAPPDATA%\Programs\openbilling (wahlweise für alle Benutzer),
 ; legt einen Startmenü-Eintrag an, bietet openbilling unter "Öffnen mit" für .ods an (ohne LibreOffice die
 ; Standardzuordnung wegzunehmen) und trägt sich unter "Apps" zum Deinstallieren ein.
@@ -10,6 +10,9 @@
 #endif
 #ifndef Bild
   #error "App-Image fehlt: /DBild=<ordner mit openbilling.exe>"
+#endif
+#ifndef Symbole
+  #error "Programmsymbol fehlt: /DSymbole=<ordner mit openbilling.ico und assistent-*.png>"
 #endif
 
 [Setup]
@@ -33,6 +36,9 @@ ChangesAssociations=yes
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayIcon={app}\openbilling.exe
+; Verknüpfungen und Dateityp nehmen das Symbol aus openbilling.exe (jpackage --icon), der Installer aus dieser Datei.
+SetupIconFile={#Symbole}\openbilling.ico
+WizardSmallImageFile={#Symbole}\assistent-58.png,{#Symbole}\assistent-87.png,{#Symbole}\assistent-116.png
 UninstallDisplayName=openbilling
 OutputDir=..\dist
 OutputBaseFilename=openbilling-{#Version}-windows-x64-setup

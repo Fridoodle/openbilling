@@ -33,6 +33,12 @@ Copy-Item target\lib "$eingabe\lib" -Recurse
 New-Item -ItemType Directory -Force "$eingabe\kosit" | Out-Null
 Copy-Item $cfg "$eingabe\kosit\config" -Recurse
 
+# Programmsymbol (openbilling.ico für beide Starter und den Installer, PNGs für den Installer-Assistenten).
+# Einzige Quelle ist openbilling.gui.Symbol, das auch das Fenstersymbol zeichnet.
+$symbole = 'target\paket\symbol'
+& java '-Djava.awt.headless=true' -cp target\openbilling.jar openbilling.gui.Symbol $symbole
+if ($LASTEXITCODE -ne 0) { throw 'Programmsymbol fehlgeschlagen' }
+
 # zweiter Starter mit Konsole für die Kommandozeile
 $cli = 'target\paket\cli.properties'
 Set-Content $cli "win-console=true`r`nlauncher-as-service=false" -Encoding ascii
@@ -50,7 +56,7 @@ $bild = 'target\paket\bild'
 & jpackage --type app-image --name openbilling --app-version $version `
     --add-modules $module `
     --jlink-options '--strip-debug --no-header-files --no-man-pages --strip-native-commands' `
-    --vendor 'openbilling' --description 'E-Rechnungen nach XRechnung' `
+    --vendor 'openbilling' --description 'E-Rechnungen nach XRechnung' --icon "$symbole\openbilling.ico" `
     --input $eingabe --main-jar openbilling.jar --main-class openbilling.Main `
     --add-launcher "openbilling-cli=$cli" `
     --java-options '-Dfile.encoding=UTF-8' `
@@ -65,7 +71,7 @@ $zip = "dist\openbilling-$version-windows-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive "$bild\openbilling" $zip
 
-& $iscc /Q "/DVersion=$version" "/DBild=$root\$bild\openbilling" packaging\openbilling.iss
+& $iscc /Q "/DVersion=$version" "/DBild=$root\$bild\openbilling" "/DSymbole=$root\$symbole" packaging\openbilling.iss
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup fehlgeschlagen' }
 $setup = "dist\openbilling-$version-windows-x64-setup.exe"
 
