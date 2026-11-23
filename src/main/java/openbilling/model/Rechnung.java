@@ -55,6 +55,7 @@ public record Rechnung(
      * Verkäufer (BG-4) oder Käufer (BG-7).
      *
      * @param name                BT-27 / BT-44
+     * @param kennung             BT-29 / BT-46, optional. Beim Verkäufer ohne USt-IdNr. nötig (BR-CO-26)
      * @param adresse             BG-5 / BG-8
      * @param kontakt             BG-6, beim Verkäufer Pflicht (BR-DE-2), beim Käufer optional
      * @param elektronischeAdresse BT-34 / BT-49
@@ -63,6 +64,7 @@ public record Rechnung(
      */
     public record Partei(
             String name,
+            String kennung,
             Adresse adresse,
             Kontakt kontakt,
             ElektronischeAdresse elektronischeAdresse,

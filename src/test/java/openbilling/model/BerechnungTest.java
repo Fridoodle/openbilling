@@ -3,55 +3,24 @@ package openbilling.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import static openbilling.Testdaten.b;
+import static openbilling.Testdaten.pos;
+
 import java.util.List;
-import openbilling.model.Rechnung.Adresse;
-import openbilling.model.Rechnung.ElektronischeAdresse;
-import openbilling.model.Rechnung.Kontakt;
-import openbilling.model.Rechnung.Partei;
+import openbilling.Testdaten;
 import openbilling.model.Rechnung.Position;
 import openbilling.model.Rechnung.Steuerkategorie;
-import openbilling.model.Rechnung.Zahlung;
 import org.junit.jupiter.api.Test;
 
 class BerechnungTest {
 
-    static final String XRECHNUNG_30 = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0";
-
-    /** Entspricht tests/fixtures/minimal-cii.xml (vom KoSIT-Validator akzeptiert). */
-    static Rechnung fixture(List<Position> positionen) {
-        var verkaeufer = new Partei("Beispiel GmbH",
-                new Adresse("Musterstraße 1", "10115", "Berlin", "DE"),
-                new Kontakt("Max Muster", "+49 30 1234567", "max.muster@beispiel-gmbh.de"),
-                new ElektronischeAdresse("EM", "rechnung@beispiel-gmbh.de"),
-                "DE123456789", null);
-        var kaeufer = new Partei("Freie Hansestadt Bremen, Senator für Finanzen",
-                new Adresse("Amtsweg 5", "28195", "Bremen", "DE"), null,
-                new ElektronischeAdresse("0204", "04011000-12345-03"), null, null);
-        return new Rechnung(XRECHNUNG_30, "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
-                "RE-2026-0001", LocalDate.of(2026, 11, 23), "380", "EUR",
-                LocalDate.of(2026, 12, 7), "04011000-12345-03",
-                "Zahlbar innerhalb von 14 Tagen ohne Abzug.", LocalDate.of(2026, 11, 20),
-                verkaeufer, kaeufer,
-                new Zahlung("58", "RE-2026-0001", "DE02120300000000202051", "Beispiel GmbH", null),
-                null, null, positionen);
-    }
-
-    static Position pos(String id, String menge, String preis, Steuerkategorie k, String satz) {
-        return new Position(id, "Leistung " + id, new BigDecimal(menge), "C62", new BigDecimal(preis), null,
-                k, satz == null ? null : new BigDecimal(satz));
-    }
-
-    static BigDecimal b(String s) {
-        return new BigDecimal(s);
+    private static Rechnung fixture(List<Position> positionen) {
+        return Testdaten.rechnung(positionen);
     }
 
     @Test
     void fixtureWerte() {
-        var p = new Position("1", "Beratungsleistung", b("10"), "HUR", b("85.00"), null,
-                Steuerkategorie.S, b("19"));
-        var e = Berechnung.berechne(fixture(List.of(p)));
+        var e = Berechnung.berechne(Testdaten.minimal());
 
         assertEquals(List.of(b("850.00")), e.zeilenbetraege());
         assertEquals(b("850.00"), e.summeZeilen());

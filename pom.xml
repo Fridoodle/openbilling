@@ -36,6 +36,13 @@
       <version>${mustang.version}</version>
     </dependency>
 
+    <!-- offizielle XRechnung-Prüfung vor dem Export (siehe knowledge/decisions.md) -->
+    <dependency>
+      <groupId>org.kosit</groupId>
+      <artifactId>validator</artifactId>
+      <version>1.6.3</version>
+    </dependency>
+
     <!-- nur Tests: prüft PDF/A-3 (veraPDF) und eingebettete XML -->
     <dependency>
       <groupId>org.mustangproject</groupId>

@@ -89,6 +89,7 @@ Spalte „P“: **M** = Pflicht in EN 16931, **DE** = zusätzlich Pflicht durch 
 | BT-20 | Payment terms | C | `cac:PaymentTerms/cbc:Note` | `SET/ram:SpecifiedTradePaymentTerms/ram:Description` | Skonto-Syntax: `#SKONTO#TAGE=14#PROZENT=2.00#` (BR-DE-18) |
 | BT-24 | Specification identifier | M | `cbc:CustomizationID` | `/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID` | siehe 1 |
 | BT-27 | Seller name | M | `cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName` | `AGR/ram:SellerTradeParty/ram:Name` | |
+| BT-29 / BT-30 | Seller identifier / legal registration ID | C | `…/cac:Party/cac:PartyIdentification/cbc:ID` / `…/cac:PartyLegalEntity/cbc:CompanyID` | `AGR/ram:SellerTradeParty/ram:ID` / `…/ram:SpecifiedLegalOrganization/ram:ID` | BT-29, BT-30 oder BT-31 Pflicht (BR-CO-26), siehe 6.1 |
 | BT-31 | Seller VAT ID | C | `…/cac:Party/cac:PartyTaxScheme[cac:TaxScheme/cbc:ID='VAT']/cbc:CompanyID` | `AGR/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID[@schemeID='VA']` | BT-31, BT-32 oder BT-63 ist Pflicht bei Kategorie S/Z/E/AE/K/G/L/M (BR-DE-16) |
 | BT-32 | Seller tax registration (Steuernummer) | C | `…/cac:PartyTaxScheme[cac:TaxScheme/cbc:ID!='VAT']/cbc:CompanyID` (TaxScheme z. B. `FC`) | `…/ram:SpecifiedTaxRegistration/ram:ID[@schemeID='FC']` | für Kleinunternehmer ohne USt-IdNr. |
 | **BT-34** | Seller electronic address | **DE** | `…/cac:Party/cbc:EndpointID/@schemeID` | `AGR/ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID/@schemeID` | Pflicht über PEPPOL-EN16931-R020 (in XRechnung 3.0 übernommen). Meist `schemeID="EM"` + E-Mail. |
@@ -225,6 +226,7 @@ Bruttopreise wie im Einzelhandel sieht EN 16931 nicht vor. Das BMF bestätigt im
 - Kleinunternehmer sind von der **Ausstellungspflicht** für E-Rechnungen befreit (§ 34a UStDV), müssen E-Rechnungen aber **empfangen** können. Eine XRechnung zu erzeugen ist trotzdem zulässig und bei B2G nötig.
 - Abbildung: Kategorie **`E`** mit **BT-119 = 0**. BT-120 als Text, z. B. „Kein Ausweis von Umsatzsteuer, da Kleinunternehmer gemäß § 19 UStG“. Einen eigenen VATEX-Code für § 19 gibt es nicht (unverifiziert); BT-121 kann deshalb leer bleiben.
 - BR-DE-16 verlangt dann **BT-31 (USt-IdNr.) oder BT-32 (Steuernummer, UBL TaxScheme `FC`, CII `schemeID="FC"`)**.
+- **Achtung, BR-CO-26 (fatal):** Die Steuernummer BT-32 allein genügt **nicht**. Ohne USt-IdNr. (BT-31) braucht der Verkäufer zusätzlich eine **Verkäuferkennung BT-29** (CII `SellerTradeParty/ram:ID`, vor `ram:Name`) oder eine **Registernummer BT-30** (CII `SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID`). Geprüft am 23.11.2026 mit KoSIT 1.6.3: Nur mit Steuernummer wird die Datei abgewiesen, mit `ram:ID` = `KU-4711` ist sie ACCEPTABLE (`CiiSchreiberTest`). Welcher Wert für BT-29 bei Kleinunternehmern üblich ist (eigene Lieferantennummer beim Kunden, Steuernummer o. Ä.), ist (unverifiziert).
 - BT-117 und BT-110 sind 0.00, BT-112 ist gleich BT-109.
 
 ### 6.2 Kleinbetragsrechnung (§ 33 UStDV, Gesamtbetrag ≤ 250 € brutto)

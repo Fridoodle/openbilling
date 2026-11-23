@@ -52,8 +52,15 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Entscheidung:** Geprüft wird mit dem offiziellen KoSIT-Validator plus der XRechnung-Konfiguration, mit festgelegten Versionen in `scripts/setup-validator.ps1`. Er läuft nur als Entwicklungs- und Testwerkzeug, nicht im ausgelieferten Rust-Binary. Eine eigene Validierungslogik wird nicht nachgebaut.
 - **Konsequenzen:** Wer entwickelt, braucht Java 11+. Rust-Tests können den Validator später als Integrationstest aufrufen (`java -jar …`, stdin auf eine leere Datei umgeleitet, siehe `lessons-learned.md`).
 
+## 2026-11-23 — CII-XML mit eigenem Schreiber, Prüfung mit KoSIT in-process
+
+- **Kontext:** Mustang hat ein eigenes Rechnungsmodell, aus dem es CII erzeugt. Wir haben aber schon ein Modell nach BT/BG. Ein Umweg über Mustangs Modell wäre eine zweite Abbildung mit eigenen Vorgaben, die man nicht sieht (z. B. welche BT es selbst setzt).
+- **Entscheidung:** `openbilling.xml.CiiSchreiber` schreibt CII D16B direkt mit `javax.xml.stream.XMLStreamWriter` (JDK, keine Bibliothek). Die Elementreihenfolge folgt der XSD-Sequenz, Vorbild ist die geprüfte Fixture. Mustang wird nur noch für Sichtkopie und Einbettung genutzt. Die Prüfung übernimmt `openbilling.pruefung.Pruefung` mit `org.kosit:validator` 1.6.3 als normale Abhängigkeit, damit die App vor dem Export selbst prüfen kann. „Exportbereit“ heißt: ACCEPTABLE und weder fatale Fehler noch Warnungen.
+- **Konsequenzen:** Volle Kontrolle über jedes Element, und jede Zeile ist einem BT zugeordnet. Neue BT müssen an der richtigen Stelle der XSD-Sequenz ergänzt werden; die Tests in `CiiSchreiberTest` prüfen jede Variante mit dem KoSIT-Validator. Die Validator-Konfiguration liegt vorerst unter `tools/kosit/config`. Wie sie mit der App ausgeliefert wird, ist noch offen. Unterstützt sind bisher nur Überweisungen (BT-81 = 30/58) und keine Rabatte oder Zuschläge auf Belegebene.
+
 ## Offen
+
+- Validator-Konfiguration mit der App ausliefern (als Ressource im JAR oder beim ersten Start nach `%APPDATA%` entpacken).
 
 - Bedienoberfläche: geplant ist zuerst eine CLI (`neu`, `pruefen`, `export`; bearbeitet wird in LibreOffice), danach ein kleines Swing-Fenster. Noch zu bestätigen.
 - Syntax der erzeugten XML: Empfehlung CII D16B als Hauptformat (nötig für die Factur-X-Einbettung), UBL optional. Noch zu bestätigen.
-- Ob CII über Mustangs Datenmodell oder eine eigene schlanke Serialisierung erzeugt wird: nach dem ersten Spike entscheiden.
