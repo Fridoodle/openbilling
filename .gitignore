@@ -1,0 +1,30 @@
+# Claude local overrides
+.claude/settings.local.json
+
+# Rust
+/target/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Export-Artefakte / lokale Testrechnungen
+out/
+*.pdf
+!tests/fixtures/**/*.pdf
+.~lock.*#
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
