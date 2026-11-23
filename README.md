@@ -84,3 +84,11 @@ Wie das Projekt aufgebaut ist und welche Entscheidungen dahinterstehen, steht in
 - [KoSIT-Validator](https://github.com/itplr-kosit/validator) mit der [XRechnung-Konfiguration](https://github.com/itplr-kosit/validator-configuration-xrechnung) (Apache-2.0)
 - [SODS](https://github.com/miachm/SODS): ODS lesen und schreiben (Unlicense)
 - [FlatLaf](https://www.formdev.com/flatlaf/): Aussehen der Oberfläche (Apache-2.0)
+
+Das Windows-Paket enthält außerdem eine Java-Laufzeit von [Eclipse Temurin](https://adoptium.net/) (GPL-2.0 mit Classpath Exception). Alle Bibliotheken samt Lizenz stehen im Paket in `DRITTANBIETER.txt`.
+
+## Lizenz
+
+openbilling ist freie Software unter der [GNU General Public License v3.0](LICENSE). Du darfst das Programm nutzen, auch gewerblich, es verändern und weitergeben. Wer eine veränderte Fassung weitergibt, muss sie ebenfalls unter der GPL-3.0 mit Quelltext weitergeben.
+
+Die Rechnungen, die du mit openbilling erstellst, gehören dir. Die Lizenz gilt für das Programm, nicht für deine Daten.

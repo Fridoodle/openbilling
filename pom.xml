@@ -9,6 +9,14 @@
   <version>0.1.0</version>
   <name>openbilling</name>
   <description>E-Rechnungen nach XRechnung aus OpenDocument-Tabellen</description>
+  <url>https://github.com/Fridoodle/openbilling</url>
+
+  <licenses>
+    <license>
+      <name>GPL-3.0-only</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+    </license>
+  </licenses>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
