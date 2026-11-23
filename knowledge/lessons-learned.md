@@ -9,6 +9,13 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Lösung:** `-D`-Argumente in einfache Anführungszeichen setzen: `mvn test '-Dtest=FacturXSpikeTest'`.
 - **Quelle:** Windows PowerShell 5.1, 2026-11-23.
 
+## PowerShell 5.1 schreibt UTF-8 mit BOM, javac scheitert daran
+
+- **Symptom:** `illegal character: '﻿'` beim Kompilieren, nachdem eine `.java`-Datei mit `Set-Content -Encoding utf8` oder `Out-File -Encoding utf8` bearbeitet wurde.
+- **Ursache:** In Windows PowerShell 5.1 bedeutet `-Encoding utf8` immer UTF-8 **mit** BOM.
+- **Lösung:** Quelltext nicht über PowerShell-Cmdlets schreiben. Wenn nötig: `[IO.File]::WriteAllText($pfad, $text, (New-Object Text.UTF8Encoding $false))`.
+- **Quelle:** 2026-11-23.
+
 ## Nur JRE installiert: Maven kann nicht kompilieren
 
 - **Symptom:** `mvn -version` läuft, zeigt aber `runtime: …\jre-21…`; `javac` fehlt.
