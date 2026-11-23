@@ -27,6 +27,7 @@ public final class Main {
             openbilling – E-Rechnungen nach XRechnung aus OpenDocument-Tabellen
 
               (ohne Argumente)                    Fenster öffnen
+              <rechnung.ods>                      Rechnung im Fenster öffnen
               --hilfe                             diese Hilfe
               neu <rechnung.ods>                  neue Rechnung aus der eigenen Vorlage anlegen
               pruefen <rechnung.ods>              XRechnung erzeugen und mit dem KoSIT-Validator prüfen
@@ -49,8 +50,10 @@ public final class Main {
     }
 
     public static void main(String[] args) throws IOException {
-        if (args.length == 0 && !java.awt.GraphicsEnvironment.isHeadless()) {
-            openbilling.gui.Fenster.starte(Einstellungen.ausBenutzerprofil()); // ohne Argumente: Fenster
+        // ohne Argumente oder mit nur einer Datei (Doppelklick, „Öffnen mit“): Fenster
+        boolean nurDatei = args.length == 1 && !args[0].startsWith("-") && Files.isRegularFile(Path.of(args[0]));
+        if ((args.length == 0 || nurDatei) && !java.awt.GraphicsEnvironment.isHeadless()) {
+            openbilling.gui.Fenster.starte(Einstellungen.ausBenutzerprofil(), nurDatei ? Path.of(args[0]) : null);
             return;
         }
         var out = new PrintStream(System.out, true, StandardCharsets.UTF_8);

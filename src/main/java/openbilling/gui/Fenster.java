@@ -59,6 +59,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import openbilling.config.Einstellungen;
 import openbilling.model.Rechnung;
 import openbilling.ods.Kunden;
@@ -91,10 +93,15 @@ public final class Fenster extends JFrame {
     private boolean geaendert;
     private Pruefung pruefung;
 
-    public static void starte(Einstellungen einstellungen) {
+    /** Öffnet das Fenster; mit {@code datei} gleich diese Rechnung, sonst die Startseite. */
+    public static void starte(Einstellungen einstellungen, Path datei) {
         SwingUtilities.invokeLater(() -> {
             design(Boolean.parseBoolean(einstellungen.wert(DUNKEL, "false")));
-            new Fenster(einstellungen).setVisible(true);
+            Fenster f = new Fenster(einstellungen);
+            f.setVisible(true);
+            if (datei != null) {
+                f.lade(datei.toAbsolutePath());
+            }
         });
     }
 
@@ -143,7 +150,9 @@ public final class Fenster extends JFrame {
     private JMenuBar menue() {
         JMenu d = new JMenu("Datei");
         d.add(eintrag("Neu…", KeyEvent.VK_N, false, this::zeigeStart));
+        d.add(vorlagenMenue("Neu aus Vorlage", this::neuAusVorlage));
         d.add(eintrag("Öffnen…", KeyEvent.VK_O, false, this::oeffne));
+        d.add(vorlagenMenue("Vorlage bearbeiten", this::bearbeiteVorlage));
         d.addSeparator();
         d.add(eintrag("Speichern", KeyEvent.VK_S, true, () -> speichere(false)));
         d.add(eintrag("Speichern unter…", 0, true, () -> speichere(true)));
@@ -259,13 +268,9 @@ public final class Fenster extends JFrame {
             return;
         }
         versuche(() -> {
-            einstellungen.vorlageAnlegen();
+            List<String> namen = vorlagenNamen();
             vorlagen.clear();
-            try (var dateien = Files.list(einstellungen.vorlagen())) {
-                dateien.map(p -> p.getFileName().toString()).filter(n -> n.toLowerCase().endsWith(".ods"))
-                        .map(n -> n.substring(0, n.length() - 4)).sorted(String.CASE_INSENSITIVE_ORDER)
-                        .forEach(vorlagen::addElement);
-            }
+            namen.forEach(vorlagen::addElement);
         });
         offen = false;
         geaendert = false;
@@ -275,6 +280,40 @@ public final class Fenster extends JFrame {
         getRootPane().setDefaultButton(erstellen);
         melde("Vorlagen liegen in " + einstellungen.vorlagen());
         titel();
+    }
+
+    /** Namen der Vorlagen ohne Endung, sortiert; legt die Standardvorlage an, falls es keine gibt. */
+    private List<String> vorlagenNamen() throws IOException {
+        einstellungen.vorlageAnlegen();
+        try (var dateien = Files.list(einstellungen.vorlagen())) {
+            return dateien.map(p -> p.getFileName().toString()).filter(n -> n.toLowerCase().endsWith(".ods"))
+                    .map(n -> n.substring(0, n.length() - 4)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        }
+    }
+
+    /** Untermenü mit allen Vorlagen, beim Aufklappen jeweils frisch aus dem Vorlagenordner gelesen. */
+    private JMenu vorlagenMenue(String text, Consumer<String> aktion) {
+        JMenu m = new JMenu(text);
+        m.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                m.removeAll();
+                List<String> namen = new ArrayList<>();
+                versuche(() -> namen.addAll(vorlagenNamen()));
+                namen.forEach(n -> {
+                    JMenuItem i = new JMenuItem(n);
+                    i.addActionListener(x -> aktion.accept(n));
+                    m.add(i);
+                });
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {}
+
+            @Override
+            public void menuCanceled(MenuEvent e) {}
+        });
+        return m;
     }
 
     private void zeigeRechnung(Entwurf e, Path quelle) {
@@ -301,6 +340,9 @@ public final class Fenster extends JFrame {
     // ------------------------------------------------------------ Dateien
 
     private void neuAusVorlage(String name) {
+        if (!verwerfenErlaubt()) {
+            return;
+        }
         versuche(() -> {
             Entwurf e = RechnungOds.leseEntwurf(einstellungen.vorlagen().resolve(name + ".ods"));
             e.daten().putIfAbsent("BT-2", LocalDate.now().format(DatumFeld.FORMAT));
@@ -315,10 +357,26 @@ public final class Fenster extends JFrame {
         }
         Path p = dateiwahl(false, "ods", null);
         if (p != null) {
+            lade(p);
+        }
+    }
+
+    private void lade(Path p) {
+        versuche(() -> {
+            zeigeRechnung(RechnungOds.leseEntwurf(p), p);
+            vorlage = null;
+            einstellungen.setze(ORDNER, p.toAbsolutePath().getParent().toString());
+        });
+    }
+
+    /** Öffnet die Vorlagendatei selbst; Speichern ändert dann die Vorlage. */
+    private void bearbeiteVorlage(String name) {
+        if (verwerfenErlaubt()) {
+            Path p = einstellungen.vorlagen().resolve(name + ".ods");
             versuche(() -> {
                 zeigeRechnung(RechnungOds.leseEntwurf(p), p);
-                vorlage = null;
-                einstellungen.setze(ORDNER, p.toAbsolutePath().getParent().toString());
+                vorlage = name;
+                melde("Vorlage „" + name + "“ wird bearbeitet. Speichern ändert die Vorlage: " + p);
             });
         }
     }
