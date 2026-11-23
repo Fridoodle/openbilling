@@ -123,6 +123,22 @@ public final class RechnungOds {
     private static final java.util.Set<String> BERECHNET =
             java.util.Set.of("BT-106", "BT-109", "BT-110", "BT-112", "BT-115", "BT-131");
 
+    /** Eingabespalten des Blatts Positionen, in dieser Reihenfolge stehen sie in {@link Entwurf#positionen}. */
+    public static final List<String> POSITIONSFELDER =
+            List.of("BT-126", "BT-153", "BT-129", "BT-130", "BT-146", "BT-149", "BT-151", "BT-152");
+
+    private static final java.util.Set<String> DATUMSFELDER = java.util.Set.of("BT-2", "BT-9", "BT-72");
+    private static final java.util.Set<String> ZAHLENFELDER =
+            java.util.Set.of("BT-113", "BT-129", "BT-146", "BT-149", "BT-152");
+
+    /**
+     * Rohe Eingaben als Text, auch unvollständig (Bedienoberfläche, Vorlagen).
+     *
+     * @param daten      BT-Kennung → Wert des Blatts Daten, leere Felder fehlen
+     * @param positionen je Position ein Feld pro Eintrag von {@link #POSITIONSFELDER}, leer = {@code null}
+     */
+    public record Entwurf(Map<String, String> daten, List<String[]> positionen) {}
+
     private static final Pattern KENNUNG = Pattern.compile("^\\s*(BT-\\d+(?:-\\d+)?)\\b");
     private static final DateTimeFormatter DATUM_DE = DateTimeFormatter.ofPattern("d.M.uuuu");
 
@@ -205,6 +221,43 @@ public final class RechnungOds {
         speichere(w, zeilen, ziel);
     }
 
+    /**
+     * Schreibt einen Entwurf, auch einen unvollständigen. Datums- und Zahlenwerte werden als solche
+     * gespeichert, wenn sie lesbar sind. Die berechneten Summen kommen nur dazu, wenn der Entwurf vollständig ist.
+     */
+    public static void schreibe(Entwurf e, Path ziel) throws IOException {
+        Map<String, Object> w = new HashMap<>();
+        e.daten().forEach((k, v) -> w.put(k, typisiert(k, v)));
+        List<BigDecimal> betraege = List.of();
+        try {
+            var erg = Berechnung.berechne(rechnung(e));
+            w.put("BT-106", erg.summeZeilen());
+            w.put("BT-109", erg.netto());
+            w.put("BT-110", erg.steuer());
+            w.put("BT-112", erg.brutto());
+            w.put("BT-115", erg.zahlbar());
+            betraege = erg.zeilenbetraege();
+        } catch (OdsFehler | IllegalArgumentException unvollstaendig) {
+            // dann ohne Summen
+        }
+        List<Object[]> zeilen = new ArrayList<>();
+        for (int i = 0; i < e.positionen().size(); i++) {
+            Object[] z = new Object[POSITIONEN.length];
+            for (int c = 0; c < POSITIONSFELDER.size(); c++) {
+                z[c] = typisiert(POSITIONSFELDER.get(c), e.positionen().get(i)[c]);
+            }
+            z[POSITIONSFELDER.size()] = betraege.size() == e.positionen().size() ? betraege.get(i) : null;
+            zeilen.add(z);
+        }
+        speichere(w, zeilen, ziel);
+    }
+
+    private static Object typisiert(String k, String s) {
+        Felder f = new Felder(s == null ? Map.of() : Map.of(k, s), new ArrayList<>(), "");
+        Object v = DATUMSFELDER.contains(k) ? f.datum(k, false) : ZAHLENFELDER.contains(k) ? f.zahl(k, false) : null;
+        return v != null ? v : s;
+    }
+
     private static void partei(Map<String, Object> w, Partei p, String name, String kennung, String strasse,
             String plz, String ort, String land, String kontakt, String telefon, String email, String adresse,
             String ustId) {
@@ -269,15 +322,75 @@ public final class RechnungOds {
     // ---------------------------------------------------------------- Lesen
 
     public static Rechnung lese(Path quelle) throws IOException {
-        SpreadSheet ss = new SpreadSheet(quelle.toFile());
+        Sheet[] b = blaetter(quelle);
         List<String> probleme = new ArrayList<>();
+        return rechnung(datenWerte(b[0], probleme), b[1].getDataRange().getValues(), probleme);
+    }
+
+    /** Liest auch unvollständige Dateien (Vorlagen, angefangene Rechnungen), ohne Pflichtfelder zu prüfen. */
+    public static Entwurf leseEntwurf(Path quelle) throws IOException {
+        Sheet[] b = blaetter(quelle);
+        Map<String, String> daten = new LinkedHashMap<>();
+        datenWerte(b[0], new ArrayList<>()).forEach((k, v) -> {
+            if (anzeige(v) != null) {
+                daten.put(k, anzeige(v));
+            }
+        });
+        Object[][] z = b[1].getDataRange().getValues();
+        List<String[]> positionen = new ArrayList<>();
+        for (int i = 1; i < z.length; i++) {
+            String[] zeile = new String[POSITIONSFELDER.size()];
+            boolean leer = true;
+            for (int c = 0; c < z[0].length && c < z[i].length; c++) {
+                String k = z[0][c] instanceof String kopf ? kennung(kopf) : null;
+                int feld = k == null ? -1 : POSITIONSFELDER.indexOf(k);
+                if (feld >= 0) {
+                    zeile[feld] = anzeige(z[i][c]);
+                    leer &= zeile[feld] == null;
+                }
+            }
+            if (!leer) {
+                positionen.add(zeile);
+            }
+        }
+        return new Entwurf(daten, positionen);
+    }
+
+    /** Prüft Pflichtfelder und Formate eines Entwurfs wie {@link #lese}. */
+    public static Rechnung rechnung(Entwurf e) {
+        Object[][] zellen = new Object[e.positionen().size() + 1][];
+        zellen[0] = POSITIONSFELDER.toArray();
+        for (int i = 0; i < e.positionen().size(); i++) {
+            zellen[i + 1] = e.positionen().get(i);
+        }
+        return rechnung(new HashMap<>(e.daten()), zellen, new ArrayList<>());
+    }
+
+    private static Sheet[] blaetter(Path quelle) throws IOException {
+        SpreadSheet ss = new SpreadSheet(quelle.toFile());
         Sheet daten = ss.getSheet(BLATT_DATEN);
         Sheet pos = ss.getSheet(BLATT_POSITIONEN);
         if (daten == null || pos == null) {
             throw new OdsFehler(List.of("Blätter '" + BLATT_DATEN + "' und '" + BLATT_POSITIONEN
                     + "' werden benötigt, gefunden: " + ss.getSheets().stream().map(Sheet::getName).toList()));
         }
-        Felder f = new Felder(datenWerte(daten, probleme), probleme);
+        return new Sheet[] {daten, pos};
+    }
+
+    /** Zellwert als Text, wie ihn ein Mensch eintippen würde: {@code 20.11.2026}, {@code 1234,5}. */
+    static String anzeige(Object v) {
+        if (v instanceof LocalDateTime dt) {
+            v = dt.toLocalDate();
+        }
+        if (v instanceof LocalDate d) {
+            return d.format(DateTimeFormatter.ofPattern("dd.MM.uuuu"));
+        }
+        String s = text(v);
+        return v instanceof Double && s != null ? s.replace('.', ',') : s;
+    }
+
+    private static Rechnung rechnung(Map<String, Object> werte, Object[][] posZellen, List<String> probleme) {
+        Felder f = new Felder(werte, probleme);
 
         var verkaeufer = new Partei(f.pflicht("BT-27"), f.text("BT-29"),
                 new Adresse(f.text("BT-35"), f.pflicht("BT-38"), f.pflicht("BT-37"), f.pflicht("BT-40")),
@@ -304,7 +417,7 @@ public final class RechnungOds {
         String spezifikation = f.pflicht("BT-24");
         String prozess = f.text("BT-23");
 
-        List<Position> positionen = positionen(pos, probleme);
+        List<Position> positionen = positionen(posZellen, probleme);
         if (positionen.isEmpty() && probleme.isEmpty()) {
             probleme.add(BLATT_POSITIONEN + ": keine Position eingetragen (BG-25)");
         }
@@ -341,8 +454,7 @@ public final class RechnungOds {
         return werte;
     }
 
-    private static List<Position> positionen(Sheet blatt, List<String> probleme) {
-        Object[][] zellen = blatt.getDataRange().getValues();
+    private static List<Position> positionen(Object[][] zellen, List<String> probleme) {
         if (zellen.length == 0) {
             return List.of();
         }

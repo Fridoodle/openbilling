@@ -61,6 +61,29 @@ public final class Einstellungen {
         return ordner.resolve("vorlagen").resolve("standard.ods");
     }
 
+    /** Ordner mit allen Rechnungsvorlagen ({@code *.ods}). */
+    public Path vorlagen() {
+        return ordner.resolve("vorlagen");
+    }
+
+    /** Adressbuch, siehe {@link openbilling.ods.Kunden}. */
+    public Path kunden() {
+        return ordner.resolve("kunden.ods");
+    }
+
+    public String wert(String schluessel, String vorgabe) {
+        return werte.getProperty(schluessel, vorgabe);
+    }
+
+    /** Setzt einen Wert und schreibt {@code einstellungen.properties} sofort. */
+    public void setze(String schluessel, String wert) throws IOException {
+        werte.setProperty(schluessel, wert);
+        Files.createDirectories(ordner);
+        try (var w = Files.newBufferedWriter(ordner.resolve(DATEI), StandardCharsets.UTF_8)) {
+            werte.store(w, "openbilling");
+        }
+    }
+
     /** Vorgabe {@code tools/kosit/config} (relativ zum Arbeitsverzeichnis, per setup-validator.ps1). */
     public Path kositKonfiguration() {
         return Path.of(werte.getProperty(KOSIT, "tools/kosit/config"));

@@ -19,7 +19,23 @@ public final class PdfExport {
 
     private PdfExport() {}
 
+    /** Hybrid-PDF: Sichtkopie mit eingebetteter XRechnung. */
     public static byte[] hybrid(String ciiXml) throws IOException {
+        byte[] xml = ciiXml.getBytes(StandardCharsets.UTF_8);
+        var out = new ByteArrayOutputStream();
+        try (var exporter = new ZUGFeRDExporterFromPDFA()) {
+            exporter.load(sicht(ciiXml))
+                    .setProducer("openbilling")
+                    .setCreator("openbilling")
+                    .setProfile(Profiles.getByName("XRECHNUNG"))
+                    .setXML(xml);
+            exporter.export(out);
+        }
+        return out.toByteArray();
+    }
+
+    /** Nur die Sichtkopie, ohne eingebettete XML. Das ist keine E-Rechnung. */
+    public static byte[] sicht(String ciiXml) throws IOException {
         byte[] xml = ciiXml.getBytes(StandardCharsets.UTF_8);
         // Visualizer liest nur aus Dateien. Die byte[]-Variante toPDF(xml, sprache) ist in Mustang 2.26.0
         // defekt (NullPointerException), deshalb über eine temporäre PDF-Datei (lessons-learned.md).
@@ -32,16 +48,7 @@ public final class PdfExport {
             if (sicht.length == 0) {
                 throw new IOException("Visualisierung hat kein PDF erzeugt");
             }
-            var out = new ByteArrayOutputStream();
-            try (var exporter = new ZUGFeRDExporterFromPDFA()) {
-                exporter.load(sicht)
-                        .setProducer("openbilling")
-                        .setCreator("openbilling")
-                        .setProfile(Profiles.getByName("XRECHNUNG"))
-                        .setXML(xml);
-                exporter.export(out);
-            }
-            return out.toByteArray();
+            return sicht;
         } finally {
             Files.deleteIfExists(tmp);
             Files.deleteIfExists(tmpPdf);
