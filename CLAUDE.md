@@ -30,15 +30,18 @@ Das Rechnungsmodell ist die zentrale Schicht: ODS-Parser und XML-/PDF-Generatore
   - Geldbeträge immer `BigDecimal`, nie `double`.
 - Neue Abhängigkeiten und ihren Grund in `knowledge/decisions.md` festhalten.
 - Ablage: Rechnungen in einem vom Nutzer gewählten Ordner; Einstellungen, Stammdaten und Vorlagen unter `%APPDATA%\openbilling\` (Details in `decisions.md`).
-- Das Maven-Projekt wird gerade angelegt. Weicht der Aufbau von den Befehlen unten ab, aktualisiere diesen Abschnitt.
+- Einfaches Maven-Projekt (`pom.xml` im Wurzelverzeichnis, Code unter `src/main/java/openbilling/`, Tests unter `src/test/java/openbilling/`; Fixtures bleiben unter `tests/fixtures/`). Weicht der Aufbau ab, aktualisiere diesen Abschnitt.
+- Maven liegt lokal unter `tools/maven/` (einmalig `.\scripts\setup-maven.ps1`). `-D`-Argumente in PowerShell quoten.
 
 ```powershell
-mvn compile                          # Build
-mvn exec:java -Dexec.args="<args>"   # Programm starten
-mvn test                             # alle Tests
-mvn test -Dtest=<Klasse>#<methode>   # einzelner Test
-mvn package                          # JAR bauen
+.\scripts\setup-maven.ps1                           # einmalig: Maven nach tools/maven/
+.\tools\maven\bin\mvn.cmd compile                   # Build
+.\tools\maven\bin\mvn.cmd test                      # alle Tests
+.\tools\maven\bin\mvn.cmd test '-Dtest=<Klasse>'    # einzelner Test
+.\tools\maven\bin\mvn.cmd package                   # JAR bauen
 ```
+
+`FacturXSpikeTest` erzeugt aus `tests/fixtures/minimal-cii.xml` ein Hybrid-PDF in `out/spike/` und prüft es mit veraPDF (über Mustangs Validator).
 
 ## Fachwissen: zuerst `knowledge/` lesen
 
