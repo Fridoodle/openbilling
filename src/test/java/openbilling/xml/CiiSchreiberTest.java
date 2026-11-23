@@ -136,6 +136,39 @@ class CiiSchreiberTest {
     }
 
     @Test
+    void sepaLastschrift() throws Exception {
+        var r = Testdaten.mitZahlung(Testdaten.lastschrift());
+        String xml = CiiSchreiber.schreibe(r);
+        assertTrue(xml.contains("<ram:CreditorReferenceID>DE98ZZZ09999999999</ram:CreditorReferenceID>"), xml);
+        assertTrue(xml.contains("<ram:DirectDebitMandateID>MANDAT-0042</ram:DirectDebitMandateID>"), xml);
+        assertFalse(xml.contains("PayeePartyCreditorFinancialAccount"), xml); // BR-DE-25-b
+        assertExportbereit(pruefe(r, "lastschrift"));
+    }
+
+    @Test
+    void lastschriftOhneFaelligkeitUndBedingungen() throws Exception {
+        var b = Testdaten.mitZahlung(Testdaten.lastschrift());
+        var r = new Rechnung(b.spezifikation(), b.prozess(), b.nummer(), b.datum(), b.typ(), b.waehrung(), null,
+                b.kaeuferReferenz(), null, b.lieferdatum(), b.verkaeufer(), b.kaeufer(), b.zahlung(), null, null,
+                b.positionen());
+        assertExportbereit(pruefe(r, "lastschrift-ohne-termine"));
+    }
+
+    @Test
+    void kreditkarte() throws Exception {
+        var z = new Rechnung.Zahlung("54", null, null, null, null, null, null,
+                new Rechnung.Karte("4242", "Erika Mustermann"));
+        assertExportbereit(pruefe(Testdaten.mitZahlung(z), "kreditkarte"));
+    }
+
+    @Test
+    void barUndOnlineZahlungsdienst() throws Exception {
+        assertExportbereit(pruefe(Testdaten.mitZahlung(new Rechnung.Zahlung("10", null, null, null, null)), "bar"));
+        var paypal = new Rechnung.Zahlung("68", "RE-2026-0001", null, null, null, "PayPal", null, null);
+        assertExportbereit(pruefe(Testdaten.mitZahlung(paypal), "paypal"));
+    }
+
+    @Test
     void fehlendeLeitwegIdWirdAbgelehnt() throws Exception {
         var basis = Testdaten.minimal();
         var r = new Rechnung(basis.spezifikation(), basis.prozess(), basis.nummer(), basis.datum(), basis.typ(),

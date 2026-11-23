@@ -13,6 +13,8 @@ import openbilling.model.Berechnung.Ergebnis;
 import openbilling.model.Berechnung.Steuergruppe;
 import openbilling.model.Rechnung;
 import openbilling.model.Rechnung.Adresse;
+import openbilling.model.Rechnung.Lastschrift;
+import openbilling.model.Rechnung.Zahlung;
 import openbilling.model.Rechnung.Partei;
 import openbilling.model.Rechnung.Position;
 import openbilling.model.Rechnung.Steuerkategorie;
@@ -20,7 +22,8 @@ import openbilling.model.Rechnung.Steuerkategorie;
 /**
  * Schreibt eine {@link Rechnung} als UN/CEFACT CII D16B (XRechnung-Syntax, einbettbar als Factur-X).
  * Die Elementreihenfolge folgt der XSD-Sequenz; Vorbild ist tests/fixtures/minimal-cii.xml.
- * Unterstützt derzeit Überweisung (BT-81 = 30/58); Karte und Lastschrift fehlen noch.
+ * Zahlungsarten: Überweisung mit BG-17, Lastschrift mit BG-19, Karte mit BG-18, alle übrigen Codes ohne
+ * diese Gruppen (BR-DE-23/24/25).
  */
 public final class CiiSchreiber {
 
@@ -40,9 +43,6 @@ public final class CiiSchreiber {
     }
 
     public static String schreibe(Rechnung r) {
-        if (!"30".equals(r.zahlung().art()) && !"58".equals(r.zahlung().art())) {
-            throw new IllegalArgumentException("Zahlungsart noch nicht unterstützt (BT-81): " + r.zahlung().art());
-        }
         StringWriter out = new StringWriter();
         try {
             XMLStreamWriter w = XMLOutputFactory.newFactory().createXMLStreamWriter(out);
@@ -230,23 +230,46 @@ public final class CiiSchreiber {
 
     private void abrechnung() throws XMLStreamException {
         start("ApplicableHeaderTradeSettlement");
-        if (r.zahlung().verwendungszweck() != null) {
-            text("PaymentReference", r.zahlung().verwendungszweck()); // BT-83
+        Zahlung z = r.zahlung();
+        Lastschrift lastschrift = z.istLastschrift() ? z.lastschrift() : null;
+        if (lastschrift != null) {
+            text("CreditorReferenceID", lastschrift.glaeubigerId()); // BT-90
+        }
+        if (z.verwendungszweck() != null) {
+            text("PaymentReference", z.verwendungszweck()); // BT-83
         }
         text("InvoiceCurrencyCode", r.waehrung()); // BT-5
 
         start("SpecifiedTradeSettlementPaymentMeans"); // BG-16
-        text("TypeCode", r.zahlung().art()); // BT-81
-        start("PayeePartyCreditorFinancialAccount"); // BG-17
-        text("IBANID", r.zahlung().iban()); // BT-84
-        if (r.zahlung().kontoinhaber() != null) {
-            text("AccountName", r.zahlung().kontoinhaber()); // BT-85
+        text("TypeCode", z.art()); // BT-81
+        if (z.text() != null) {
+            text("Information", z.text()); // BT-82
         }
-        end();
-        if (r.zahlung().bic() != null) {
-            start("PayeeSpecifiedCreditorFinancialInstitution");
-            text("BICID", r.zahlung().bic()); // BT-86
+        if (z.istKarte() && z.karte() != null) { // BG-18
+            start("ApplicableTradeSettlementFinancialCard");
+            text("ID", z.karte().nummer()); // BT-87
+            if (z.karte().inhaber() != null) {
+                text("CardholderName", z.karte().inhaber()); // BT-88
+            }
             end();
+        }
+        if (lastschrift != null) {
+            start("PayerPartyDebtorFinancialAccount");
+            text("IBANID", lastschrift.iban()); // BT-91
+            end();
+        }
+        if (z.istUeberweisung()) {
+            start("PayeePartyCreditorFinancialAccount"); // BG-17
+            text("IBANID", z.iban()); // BT-84
+            if (z.kontoinhaber() != null) {
+                text("AccountName", z.kontoinhaber()); // BT-85
+            }
+            end();
+            if (z.bic() != null) {
+                start("PayeeSpecifiedCreditorFinancialInstitution");
+                text("BICID", z.bic()); // BT-86
+                end();
+            }
         }
         end();
 
@@ -296,13 +319,16 @@ public final class CiiSchreiber {
         }
 
         String bedingungen = zahlungsbedingungen(r);
-        if (bedingungen != null || r.faelligAm() != null) {
+        if (bedingungen != null || r.faelligAm() != null || lastschrift != null) {
             start("SpecifiedTradePaymentTerms");
             if (bedingungen != null) {
                 text("Description", bedingungen); // BT-20
             }
             if (r.faelligAm() != null) {
                 datum("DueDateDateTime", r.faelligAm()); // BT-9
+            }
+            if (lastschrift != null) {
+                text("DirectDebitMandateID", lastschrift.mandat()); // BT-89
             }
             end();
         }

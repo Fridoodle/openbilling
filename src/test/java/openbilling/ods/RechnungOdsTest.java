@@ -67,6 +67,46 @@ class RechnungOdsTest {
     }
 
     @Test
+    void lastschriftSchreibenUndLesen() throws Exception {
+        Path datei = tmp.resolve("lastschrift.ods");
+        Rechnung original = Testdaten.mitZahlung(Testdaten.lastschrift());
+        RechnungOds.schreibe(original, datei);
+        Rechnung gelesen = RechnungOds.lese(datei);
+        assertEquals(original.zahlung(), gelesen.zahlung());
+        var e = pruefung.pruefe(CiiSchreiber.schreibe(gelesen), "lastschrift-aus-ods");
+        assertTrue(e.exportbereit(), () -> "Meldungen: " + e.meldungen());
+    }
+
+    @Test
+    void zahlungsartBestimmtPflichtfelderUndUebrigeBleibenDraussen() throws Exception {
+        Path datei = tmp.resolve("ueberweisung.ods");
+        RechnungOds.schreibe(Testdaten.minimal(), datei);
+        var entwurf = RechnungOds.leseEntwurf(datei);
+        var daten = entwurf.daten();
+        java.util.function.Supplier<Rechnung> lies =
+                () -> RechnungOds.rechnung(new RechnungOds.Entwurf(daten, entwurf.positionen()));
+
+        daten.put("BT-81", "59");
+        String alle = String.join("\n", assertThrows(OdsFehler.class, lies::get).probleme());
+        assertTrue(alle.contains("BT-89:") && alle.contains("BT-90:") && alle.contains("BT-91:"), alle);
+
+        daten.put("BT-89", "M-1");
+        daten.put("BT-90", "DE98ZZZ09999999999");
+        daten.put("BT-91", "DE89370400440532013000");
+        Rechnung r = lies.get();
+        assertNull(r.zahlung().iban()); // BT-84 steht noch im Entwurf, gehört aber nicht zur Lastschrift
+        assertEquals("M-1", r.zahlung().lastschrift().mandat());
+
+        daten.put("BT-81", "54");
+        daten.put("BT-87", "4111 1111 1111 1111");
+        String fehler = assertThrows(OdsFehler.class, lies::get).getMessage();
+        assertTrue(fehler.contains("BT-87") && fehler.contains("BR-51"), fehler);
+        daten.put("BT-87", "1111");
+        assertEquals("1111", lies.get().zahlung().karte().nummer());
+        assertNull(lies.get().zahlung().lastschrift());
+    }
+
+    @Test
     void fixtureOdsErgibtGueltigeXRechnung() throws Exception {
         Rechnung r = RechnungOds.lese(FIXTURE);
         assertGleicheSummen(Testdaten.minimal(), r);

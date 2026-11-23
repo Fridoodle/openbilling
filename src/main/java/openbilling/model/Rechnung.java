@@ -154,15 +154,57 @@ public record Rechnung(
     public record ElektronischeAdresse(String schema, String wert) {}
 
     /**
-     * BG-16 Zahlungsanweisung.
+     * BG-16 Zahlungsanweisung. Welche Teile gefüllt sind, hängt von der Zahlungsart ab (BR-DE-23/24/25):
+     * Überweisung (30, 58) mit IBAN des Verkäufers, Lastschrift (59) mit {@link Lastschrift},
+     * Karte (48, 54, 55) mit {@link Karte}, sonst (z. B. 10 bar, 68 Online-Zahlungsdienst) nichts davon.
      *
-     * @param art              BT-81 (58 SEPA-Überweisung, 59 Lastschrift, …)
+     * @param art              BT-81 (UNTDID 4461)
      * @param verwendungszweck BT-83, optional
-     * @param iban             BT-84
+     * @param iban             BT-84, nur bei Überweisung
      * @param kontoinhaber     BT-85, optional
      * @param bic              BT-86, optional
+     * @param text             BT-82 Zahlungsart als Text (z. B. „PayPal“), optional; die ODS liest ihn nur bei
+     *                         Arten ohne BG-17/18/19
+     * @param lastschrift      BG-19, nur bei Lastschrift
+     * @param karte            BG-18, nur bei Kartenzahlung
      */
-    public record Zahlung(String art, String verwendungszweck, String iban, String kontoinhaber, String bic) {}
+    public record Zahlung(String art, String verwendungszweck, String iban, String kontoinhaber, String bic,
+            String text, Lastschrift lastschrift, Karte karte) {
+
+        /** Überweisung. */
+        public Zahlung(String art, String verwendungszweck, String iban, String kontoinhaber, String bic) {
+            this(art, verwendungszweck, iban, kontoinhaber, bic, null, null, null);
+        }
+
+        public boolean istUeberweisung() {
+            return "30".equals(art) || "58".equals(art);
+        }
+
+        public boolean istLastschrift() {
+            return "59".equals(art);
+        }
+
+        public boolean istKarte() {
+            return "48".equals(art) || "54".equals(art) || "55".equals(art);
+        }
+    }
+
+    /**
+     * BG-19 SEPA-Lastschrift.
+     *
+     * @param mandat       BT-89 Mandatsreferenz
+     * @param glaeubigerId BT-90 Gläubiger-Identifikationsnummer des Verkäufers (BR-DE-30)
+     * @param iban         BT-91 IBAN des Kontos, das belastet wird (BR-DE-31)
+     */
+    public record Lastschrift(String mandat, String glaeubigerId, String iban) {}
+
+    /**
+     * BG-18 Kartenzahlung.
+     *
+     * @param nummer  BT-87 nur die letzten 4 bis 6 Ziffern der Kartennummer (BR-51), nie die ganze
+     * @param inhaber BT-88, optional
+     */
+    public record Karte(String nummer, String inhaber) {}
 
     /**
      * BG-25 Rechnungsposition.

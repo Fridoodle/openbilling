@@ -13,7 +13,8 @@ import java.util.Map;
 
 /**
  * Adressbuch {@code kunden.ods}: Blatt {@code Kunden}, Zeile 1 Spaltenköpfe mit BT-Kennung (Käuferfelder
- * der Rechnung plus BT-10), darunter eine Zeile je Kunde. Wie bei {@link RechnungOds} zählt nur die Kennung.
+ * der Rechnung plus BT-10 und Lastschriftmandat BT-89/BT-91), darunter eine Zeile je Kunde. Wie bei
+ * {@link RechnungOds} zählt nur die Kennung.
  */
 public final class Kunden {
 
@@ -33,6 +34,8 @@ public final class Kunden {
         "BT-49-1 Schema (EM = E-Mail, 0204 = Leitweg-ID)",
         "BT-48 USt-IdNr.",
         "BT-10 Leitweg-ID / Käuferreferenz",
+        "BT-89 Mandatsreferenz (SEPA-Lastschrift)",
+        "BT-91 IBAN für die Lastschrift",
     };
 
     /** BT-Kennungen, die ein Kunde trägt. */

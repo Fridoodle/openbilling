@@ -80,6 +80,34 @@ class PdfExportTest {
     }
 
     @Test
+    void lastschriftMitVorabankuendigung() throws Exception {
+        var r = Testdaten.mitZahlung(Testdaten.lastschrift());
+        byte[] pdf = PdfExport.hybrid(r, CiiSchreiber.schreibe(r));
+        Path datei = Files.createDirectories(Path.of("out/pdf")).resolve("lastschrift.pdf");
+        Files.write(datei, pdf);
+        try (var doc = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.contains("SEPA-Lastschrift") && text.contains("MANDAT-0042")
+                    && text.contains("DE98ZZZ09999999999"), text);
+            assertTrue(text.contains("Den Betrag von 1.011,50 € ziehen wir am 07.12.2026 per SEPA-Lastschrift von"
+                    + " Ihrem Konto DE89 … 3000 ein."), text);
+            assertTrue(!text.contains("DE89370400440532013000") && !text.contains("DE02 1203"), text);
+        }
+        var validator = new ZUGFeRDValidator();
+        assertTrue(validator.validate(datei.toString()) != null && validator.wasCompletelyValid());
+    }
+
+    @Test
+    void kartenzahlungZeigtNurLetzteZiffern() throws Exception {
+        var z = new openbilling.model.Rechnung.Zahlung("54", null, null, null, null, null, null,
+                new openbilling.model.Rechnung.Karte("4242", null));
+        try (var doc = Loader.loadPDF(PdfExport.sicht(Testdaten.mitZahlung(z)))) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.contains("Kreditkarte") && text.contains("endet auf 4242"), text);
+        }
+    }
+
+    @Test
     void schlussformelStehtUntenImPdf() throws Exception {
         var r = Testdaten.mitSchlussformel("Vielen Dank für die gute Zusammenarbeit.\nMit freundlichen Grüßen\n"
                 + "Max Mustermann");

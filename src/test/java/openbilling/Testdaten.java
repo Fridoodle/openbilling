@@ -58,6 +58,23 @@ public final class Testdaten {
                 r.leistungVon(), r.leistungBis(), schlussformel);
     }
 
+    /** {@link #minimal()} mit anderer Zahlungsanweisung. */
+    public static Rechnung mitZahlung(Zahlung z) {
+        Rechnung r = minimal();
+        return new Rechnung(r.spezifikation(), r.prozess(), r.nummer(), r.datum(), r.typ(), r.waehrung(),
+                r.faelligAm(), r.kaeuferReferenz(), r.zahlungsbedingungen(), r.lieferdatum(), r.verkaeufer(),
+                r.kaeufer(), z, r.befreiungsgrund(), r.vorausbezahlt(), r.positionen());
+    }
+
+    /**
+     * SEPA-Lastschrift. DE98ZZZ09999999999 ist die Test-Gläubiger-ID der Bundesbank,
+     * die IBAN ein bekanntes prüfziffernkorrektes Beispiel.
+     */
+    public static Zahlung lastschrift() {
+        return new Zahlung("59", "RE-2026-0001", null, null, null, null,
+                new Rechnung.Lastschrift("MANDAT-0042", "DE98ZZZ09999999999", "DE89370400440532013000"), null);
+    }
+
     /** {@link #minimal()} mit Firmenname im PDF-Kopf (nur Sichtkopie). */
     public static Rechnung mitFirmenname(String firmenname) {
         Rechnung r = minimal();
