@@ -145,3 +145,10 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Symptom:** `python3` startet nur den Microsoft-Store-Hinweis. `Out-File -Encoding utf8` bzw. `Set-Content -Encoding utf8` schreiben eine BOM; jshell bricht dann mit `illegal character: '﻿'` ab, und `java.util.Properties` würde die erste Zeile als Schlüssel mit BOM lesen.
 - **Lösung:** Für Skripte `-Encoding ascii` oder `[IO.File]::WriteAllText(pfad, text, (New-Object Text.UTF8Encoding $false))`. Für Quelltext-Änderungen die Edit-Werkzeuge oder `sed` aus Git Bash.
 - **Quelle:** eigene Erfahrung, 2026-11-23.
+
+## Mausrad über mehrzeiligen Feldern rollt die Seite nicht (Swing)
+
+- **Symptom:** Steht der Mauszeiger über einem mehrzeiligen Feld (`JTextArea` in einem `JScrollPane`, z. B. Schlussformel), rollt das Mausrad die Formularseite nicht mehr.
+- **Ursache:** Jeder `JScrollPane` fängt das Mausrad ab, auch wenn er selbst nichts zu rollen hat. Das Ereignis erreicht den äußeren Scrollbereich nicht.
+- **Lösung:** `Formular.rollbar`: `setWheelScrollingEnabled(false)` und ein eigener `MouseWheelListener`. Er rollt das Feld, solange es dort noch etwas zu rollen gibt, und reicht das Ereignis sonst mit `SwingUtilities.convertMouseEvent` an den Elternteil weiter. Von dort wandert es bis zum äußeren `JScrollPane`.
+- **Quelle:** 2026-11-23, JDK 21, geprüft mit simulierten `MouseWheelEvent`s.

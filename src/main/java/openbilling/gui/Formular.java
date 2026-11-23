@@ -30,12 +30,14 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -272,7 +274,7 @@ final class Formular extends JPanel implements Scrollable {
         l.setLabelFor(f);
         JPanel p = new JPanel(new BorderLayout(0, 3));
         p.add(l, BorderLayout.NORTH);
-        p.add(f instanceof JTextArea ? new JScrollPane(f) : f);
+        p.add(f instanceof JTextArea ? rollbar(f) : f);
         return p;
     }
 
@@ -280,6 +282,27 @@ final class Formular extends JPanel implements Scrollable {
         a.setLineWrap(true);
         a.setWrapStyleWord(true);
         return a;
+    }
+
+    /**
+     * Scrollbereich für ein mehrzeiliges Feld. Das Mausrad rollt das Feld nur, solange dort noch etwas zu rollen
+     * ist, sonst die ganze Seite. Ein normaler {@link JScrollPane} schluckt das Mausrad immer.
+     */
+    private static JScrollPane rollbar(JComponent inhalt) {
+        JScrollPane s = new JScrollPane(inhalt);
+        s.setWheelScrollingEnabled(false);
+        s.addMouseWheelListener(e -> {
+            JScrollBar b = s.getVerticalScrollBar();
+            boolean nachOben = e.getWheelRotation() < 0;
+            boolean kann = b.isVisible() && (nachOben ? b.getValue() > b.getMinimum()
+                    : b.getValue() + b.getVisibleAmount() < b.getMaximum());
+            if (kann) {
+                b.setValue(b.getValue() + e.getUnitsToScroll() * b.getUnitIncrement(nachOben ? -1 : 1));
+            } else {
+                s.getParent().dispatchEvent(SwingUtilities.convertMouseEvent(s, e, s.getParent()));
+            }
+        });
+        return s;
     }
 
     /** Zurückhaltende Textfarbe, die beim Wechsel des Designs mitgeht. */
@@ -431,7 +454,7 @@ final class Formular extends JPanel implements Scrollable {
         JPanel detail = new JPanel(new BorderLayout(0, 3));
         detail.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
         detail.add(titel, BorderLayout.NORTH);
-        detail.add(new JScrollPane(beschreibung));
+        detail.add(rollbar(beschreibung));
 
         JPanel p = abschnitt("Positionen", null);
         for (JComponent teil : new JComponent[] {rahmen, knoepfe, detail}) {
