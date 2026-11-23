@@ -132,3 +132,36 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Ursache:** `setIconImages` setzt nur das Symbol des Fensters zur Laufzeit. Alles, was Windows ohne laufendes Programm anzeigt, liest das Symbol aus den Ressourcen von `openbilling.exe`. Ohne `--icon` setzt jpackage dort sein eigenes Standardsymbol ein.
 - **Lösung:** `jpackage --icon <datei.ico>`. Der zusätzliche Starter aus `--add-launcher` (`openbilling-cli.exe`) übernimmt das Symbol des Hauptstarters, wenn seine Properties-Datei kein `icon=` angibt. Prüfen ohne Installation: `[System.Drawing.Icon]::ExtractAssociatedIcon('openbilling.exe').ToBitmap().Save('x.png')` in PowerShell. Wer das Fenster per Skript sucht: Der jpackage-Starter startet sich als Kindprozess gleichen Namens noch einmal, das Fenster gehört dem Kind, nicht dem Prozess aus `Start-Process`. Eine .ico braucht kein Grafikwerkzeug: Kopf (6 Byte), je Bild ein 16-Byte-Verzeichniseintrag, dann die Bilder als BITMAPINFOHEADER mit doppelter Höhe plus BGRA-Zeilen von unten und 1-Bit-Maske (256 px als PNG), siehe `Symbol.ico()`.
 - **Quelle:** https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html (`--icon`), https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10) (ICO-Format), 2026-11-23.
+
+## ODS-Zahlen kommen als Double zurück: Prozentsätze und Beträge vor der XML normieren
+
+- **Symptom:** Nach `RechnungOds.schreibe` und `lese` steht in der XML `10.0` statt `10` (`CalculationPercent`) und `50.0` statt `50.00` (`ChargeAmount`). Der Validator akzeptiert beides, aber ein Byte-Vergleich der XML vor und nach dem ODS-Umweg schlägt fehl.
+- **Ursache:** SODS liefert Zahlzellen als `Double`; `BigDecimal.valueOf(10.0)` ergibt `10.0` mit Skala 1. Beträge, die durch `Berechnung` laufen, werden auf zwei Stellen gerundet, Eingabewerte wie Preis, Menge und Prozent nicht.
+- **Lösung:** Prozentsätze in `CiiSchreiber` über `satz()` (`stripTrailingZeros`) ausgeben. Tests vergleichen nach dem ODS-Umweg Beträge und Texte, nicht die ganze XML. Für BigDecimal-Vergleiche `compareTo` statt `equals` nutzen.
+- **Quelle:** `RechnungOdsTest.rabatteZuschlaegeUndSkontoUeberstehenOds`, 2026-11-23.
+
+## Datei-Bearbeitung unter Windows: kein Python, PowerShell 5.1 schreibt BOM
+
+- **Symptom:** `python3` startet nur den Microsoft-Store-Hinweis. `Out-File -Encoding utf8` bzw. `Set-Content -Encoding utf8` schreiben eine BOM; jshell bricht dann mit `illegal character: '﻿'` ab, und `java.util.Properties` würde die erste Zeile als Schlüssel mit BOM lesen.
+- **Lösung:** Für Skripte `-Encoding ascii` oder `[IO.File]::WriteAllText(pfad, text, (New-Object Text.UTF8Encoding $false))`. Für Quelltext-Änderungen die Edit-Werkzeuge oder `sed` aus Git Bash.
+- **Quelle:** eigene Erfahrung, 2026-11-23.
+
+## Mausrad über mehrzeiligen Feldern rollt die Seite nicht (Swing)
+
+- **Symptom:** Steht der Mauszeiger über einem mehrzeiligen Feld (`JTextArea` in einem `JScrollPane`, z. B. Schlussformel), rollt das Mausrad die Formularseite nicht mehr.
+- **Ursache:** Jeder `JScrollPane` fängt das Mausrad ab, auch wenn er selbst nichts zu rollen hat. Das Ereignis erreicht den äußeren Scrollbereich nicht.
+- **Lösung:** `Formular.rollbar`: `setWheelScrollingEnabled(false)` und ein eigener `MouseWheelListener`. Er rollt das Feld, solange es dort noch etwas zu rollen gibt, und reicht das Ereignis sonst mit `SwingUtilities.convertMouseEvent` an den Elternteil weiter. Von dort wandert es bis zum äußeren `JScrollPane`.
+- **Quelle:** 2026-11-23, JDK 21, geprüft mit simulierten `MouseWheelEvent`s.
+
+## FlatLaf-Zoom (Schriftgröße): was mitwächst und was nicht
+
+- **Ziel:** Unter „Ansicht → Schriftgröße“ die ganze Oberfläche vergrößern (100 % bis 200 %), z. B. für ältere Nutzer.
+- **Lösung:** `UIScale.setZoomFactor(f)` (FlatLaf ab 3.6) und danach das Design neu setzen (`FlatLightLaf.setup()`/`FlatDarkLaf.setup()` plus `FlatLaf.updateUI()`). FlatLaf rechnet den Zoom beim Aufbau der UI-Defaults in Schrift und Abstände ein; ein bloßes `updateUI()` reicht nicht. Beim Start den Zoom vor dem ersten `setup()` setzen.
+- **Stolperfallen:**
+  - Feste Pixelwerte (`setRowHeight(30)`, `setFixedCellHeight(34)`, `setPreferredSize`, Spaltenbreiten, Icon-Größen) wachsen nicht mit. Mit `UIScale.scale(…)` rechnen, und zwar dort, wo der Wert gelesen wird (`getPreferredSize()` überschreiben oder in `updateUI()` neu setzen), sonst gilt nach einem Wechsel zur Laufzeit der alte Wert.
+  - `font.deriveFont(…)` erzeugt eine normale Schrift (keine `UIResource`), die beim Zoom gleich groß bleibt. Stattdessen `putClientProperty("FlatLaf.style", "font: bold +5")`.
+  - `FlatEmptyBorder` skaliert zwar, ist aber eine `UIResource` und verschwindet beim `updateUI()` eines Panels. Deshalb `Formular.rand(…)`: ein `EmptyBorder` ohne `UIResource`, dessen Insets mit `UIScale.scale` gerechnet werden.
+  - `GridBagLayout` fällt auf die **Mindestgrößen** aller Kinder zurück, sobald der Platz in Breite *oder Höhe* kleiner ist als die bevorzugte Größe. Folge: mehrzeilige Felder schrumpfen auf eine Zeile, Knöpfe und Kopfzeilen zeigen „…“. Abhilfe: Inhalt nie breiter anfordern als der Sichtbereich, und unterhalb einer hochgerechneten Mindestbreite (`Formular.SCHMAL`) waagrecht rollen statt zu stauchen (`getScrollableTracksViewportWidth`).
+  - Die Startgröße des Fensters mit dem Zoom hochrechnen (begrenzt auf `getMaximumWindowBounds()`), sonst passt der vergrößerte Inhalt nicht.
+- **Prüfen:** Formular wie in der App in einen `JScrollPane` legen und offscreen rendern (siehe „Swing-Fenster ohne Bildschirm prüfen“), einmal mit Zoom beim Start und einmal mit Wechsel zur Laufzeit. Ohne `JScrollPane` greift der Höhen-Rückfall von `GridBagLayout` und das Bild täuscht.
+- **Quelle:** FlatLaf 3.8 (`com.formdev.flatlaf.util.UIScale`), 2026-11-23.

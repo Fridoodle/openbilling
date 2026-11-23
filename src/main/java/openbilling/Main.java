@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import openbilling.config.Einstellungen;
@@ -103,6 +104,7 @@ public final class Main {
         }
         Files.copy(einstellungen.vorlage(), ziel);
         out.println("Neue Rechnung: " + ziel + " (in LibreOffice ausfüllen, dann 'pruefen')");
+        out.println("  Nächste Rechnungsnummer (BT-1): " + einstellungen.naechsteNummer(LocalDate.now()));
         return OK;
     }
 
@@ -141,7 +143,9 @@ public final class Main {
             return UNGUELTIG;
         }
         Files.writeString(xmlDatei, xml, StandardCharsets.UTF_8);
-        Files.write(pdfDatei, PdfExport.hybrid(RechnungOds.lese(datei), xml));
+        Rechnung r = RechnungOds.lese(datei);
+        Files.write(pdfDatei, PdfExport.hybrid(r, xml));
+        einstellungen.merkeNummer(r.nummer());
         out.println("Geschrieben: " + xmlDatei);
         out.println("Geschrieben: " + pdfDatei + " (PDF/A-3 mit eingebetteter xrechnung.xml)");
         return OK;

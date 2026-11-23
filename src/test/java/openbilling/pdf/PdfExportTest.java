@@ -61,6 +61,25 @@ class PdfExportTest {
     }
 
     @Test
+    void rabatteZuschlaegeUndSkontoImPdf() throws Exception {
+        var r = Testdaten.rabattiert();
+        byte[] pdf = PdfExport.hybrid(r, openbilling.xml.CiiSchreiber.schreibe(r));
+        Path datei = Files.createDirectories(Path.of("out/pdf")).resolve("rabatte.pdf");
+        Files.write(datei, pdf);
+        try (var doc = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(doc).replace("\r", "");
+            assertTrue(text.contains("10 % Rabatt auf 100,00 €: −10,00 €"), text);
+            assertTrue(text.contains("Treuerabatt 5 %") && text.contains("−10,50 €"), text);
+            assertTrue(text.contains("Versand") && text.contains("+4,90 €"), text);
+            assertTrue(text.contains("2 % Skonto (4,82 €)"), text);
+            assertTrue(!text.contains("#SKONTO#"), text);
+        }
+        var validator = new ZUGFeRDValidator();
+        String bericht = validator.validate(datei.toString());
+        assertTrue(validator.wasCompletelyValid(), bericht);
+    }
+
+    @Test
     void schlussformelStehtUntenImPdf() throws Exception {
         var r = Testdaten.mitSchlussformel("Vielen Dank für die gute Zusammenarbeit.\nMit freundlichen Grüßen\n"
                 + "Max Mustermann");

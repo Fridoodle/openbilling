@@ -112,6 +112,12 @@ final class Layout {
                 s.append("<fo:block font-size=\"90%\" color=\"").append(GRAU)
                         .append("\" linefeed-treatment=\"preserve\">").append(x(p.beschreibung())).append("</fo:block>");
             }
+            if (p.rabatt() != null) {
+                s.append("<fo:block font-size=\"90%\" color=\"").append(GRAU).append("\">")
+                        .append(x("abzüglich " + zahl(p.rabatt()) + " % Rabatt auf " + geld(e.grundbetraege().get(i), w)
+                                + ": −" + geld(e.zeilenrabatte().get(i), w)))
+                        .append("</fo:block>");
+            }
             s.append("</fo:table-cell>");
             s.append(zelle(pauschal ? "pauschal" : x(zahl(p.menge()) + " " + einheit(p.einheit())), "end"));
             s.append(zelle(pauschal ? "" : x(geld(p.nettopreis(), w)
@@ -127,6 +133,17 @@ final class Layout {
                 <fo:table-column column-width="85mm"/><fo:table-column column-width="50mm"/>
                 <fo:table-column column-width="30mm"/><fo:table-body>
                 """);
+        if (!r.abschlaegeZuschlaege().isEmpty()) {
+            summe(s, "Summe Positionen", geld(e.summeZeilen(), w), false);
+            for (int i = 0; i < r.abschlaegeZuschlaege().size(); i++) {
+                var a = r.abschlaegeZuschlaege().get(i);
+                int quelle = i;
+                BigDecimal betrag = e.belegposten().stream().filter(b -> b.quelle() == quelle)
+                        .map(b -> b.betrag()).reduce(BigDecimal.ZERO, BigDecimal::add);
+                summe(s, a.text() + (a.prozent() != null ? " " + zahl(a.prozent()) + " %" : ""),
+                        (a.zuschlag() ? "+" : "−") + geld(betrag, w), false);
+            }
+        }
         summe(s, "Betrag netto", geld(e.netto(), w), false);
         for (var g : e.steuergruppen()) {
             summe(s, zahl(g.satz() == null ? BigDecimal.ZERO : g.satz()) + " % USt"
@@ -140,7 +157,15 @@ final class Layout {
         }
         s.append("</fo:table-body></fo:table>\n");
 
-        for (String text : new String[] {r.befreiungsgrund(), r.zahlungsbedingungen()}) {
+        String skonto = null;
+        if (r.skonto() != null) {
+            String prozent = zahl(r.skonto().prozent()) + " %";
+            BigDecimal abzug = Berechnung.skonto(e, r.skonto().prozent());
+            skonto = "Bei Zahlung innerhalb von " + r.skonto().tage() + " Tagen ab Rechnungsdatum gewähren wir "
+                    + prozent + " Skonto (" + geld(abzug, w) + "), Sie zahlen dann " + geld(e.zahlbar().subtract(abzug), w)
+                    + ".";
+        }
+        for (String text : new String[] {r.befreiungsgrund(), r.zahlungsbedingungen(), skonto}) {
             if (!leer(text)) {
                 s.append("<fo:block space-before=\"6mm\" linefeed-treatment=\"preserve\">").append(x(text))
                         .append("</fo:block>\n");

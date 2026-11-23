@@ -1,9 +1,9 @@
 package openbilling.gui;
 
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultCellEditor;
@@ -30,13 +29,17 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -73,7 +76,10 @@ final class Formular extends JPanel implements Scrollable {
 
     // Spalten des Tabellenmodells; BASIS (BT-149) wird nicht angezeigt, aber mitgeführt
     private static final int POS = 0, TEXT = 1, MENGE = 2, EINHEIT = 3, PREIS = 4, STEUER = 5, BETRAG_SPALTE = 6,
-            BASIS = 7, BESCHREIBUNG = 8;
+            BASIS = 7, BESCHREIBUNG = 8, RABATT = 9;
+
+    /** Zahlenfelder im Kopf, die wie die Positionen ohne Tausenderpunkte gespeichert werden. */
+    private static final Set<String> ZAHLEN = Set.of("BT-92", "BT-94", "BT-99", "BT-101", "OB-3", "OB-4");
 
     /**
      * Felder, ohne die keine gültige XRechnung entsteht: Pflicht im Rechnungsmodell (RechnungOds) oder für den
@@ -85,13 +91,27 @@ final class Formular extends JPanel implements Scrollable {
     private final Map<String, JTextComponent> felder = new LinkedHashMap<>();
     private final Map<String, String> namen = new HashMap<>();
     private final DefaultTableModel positionen = new DefaultTableModel(
-            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", "", ""}, 0) {
+            new String[] {"Pos.", "Bezeichnung", "Menge", "Einheit", "Einzelpreis", "USt", "Betrag", "", "",
+                "Rabatt %"}, 0) {
         @Override
         public boolean isCellEditable(int zeile, int spalte) {
             return spalte != BETRAG_SPALTE;
         }
     };
-    private final JTable tabelle = new JTable(positionen);
+    /** Schmalste Breite des Inhalts bei normaler Größe; bei Zoom hochgerechnet. */
+    private static final int SCHMAL = 720;
+    private final JTable tabelle = new JTable(positionen) {
+        @Override
+        public void updateUI() { // Zeilenhöhe und Spaltenbreiten wachsen mit der Schriftgröße
+            super.updateUI();
+            setRowHeight(UIScale.scale(30));
+            if (spaltenBreiten != null) { // null, solange der Konstruktor von JTable läuft
+                spaltenBreiten.forEach((spalte, breite) -> spalte.setPreferredWidth(UIScale.scale(breite)));
+            }
+        }
+    };
+    /** Spaltenbreiten der Positionstabelle bei normaler Größe. */
+    private final Map<javax.swing.table.TableColumn, Integer> spaltenBreiten = new HashMap<>();
     private final JLabel netto = new JLabel();
     private final JLabel steuer = new JLabel();
     private final JLabel gesamt = new JLabel();
@@ -105,7 +125,7 @@ final class Formular extends JPanel implements Scrollable {
 
     Formular(Runnable ausAdressbuch, Runnable insAdressbuch) {
         super(new GridBagLayout());
-        setBorder(BorderFactory.createEmptyBorder(24, 32, 32, 32));
+        setBorder(rand(24, 32, 32, 32));
 
         JLabel hinweis = gedaempft(new JLabel("* Pflichtfeld"));
         hinweis.putClientProperty("FlatLaf.styleClass", "small");
@@ -135,10 +155,9 @@ final class Formular extends JPanel implements Scrollable {
                 + " z. B. eine Lieferanten- oder Geschäftsnummer (Regel BR-CO-26).");
         felder.get("BT-29").putClientProperty("JTextField.placeholderText", "ohne USt-IdNr.");
 
-        JPanel knoepfe = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        knoepfe.add(knopf("Aus Adressbuch…", ausAdressbuch));
-        knoepfe.add(knopf("Im Adressbuch speichern", insAdressbuch));
-        JPanel empfaenger = abschnitt("Empfänger", knoepfe);
+        // Steht neben „Firmenname im PDF-Kopf“, damit die Adressfelder beider Seiten auf einer Höhe liegen
+        JPanel empfaenger = abschnitt("Empfänger", null);
+        empfaenger.add(zeile(adressbuch(ausAdressbuch, insAdressbuch), 1));
         partei(empfaenger, "Empfänger", "BT-44", "BT-50", "BT-53", "BT-52", "BT-55", "BT-56", "BT-57", "BT-58",
                 "BT-49");
         empfaenger.add(zeile(feld("BT-48", "USt-IdNr.", "Empfänger"), 1,
@@ -155,8 +174,35 @@ final class Formular extends JPanel implements Scrollable {
         zahlung.add(zeile(feld("BT-120", "Grund der Steuerbefreiung", "Zahlung"), 1));
         tipp("BT-120", "Nur nötig, wenn eine Position steuerfrei ist, z. B. Kleinunternehmer nach § 19 UStG.");
 
+        zahlung.add(Box.createVerticalStrut(18));
+        JPanel nachlass = abschnitt("Rabatt, Zuschlag und Skonto", null);
+        nachlass.add(zeile(feld("BT-94", "Rabatt %", "Rabatt"), 1, feld("BT-92", "oder Rabatt €", "Rabatt"), 1,
+                feld("BT-97", "Grund", "Rabatt"), 2));
+        nachlass.add(zeile(feld("BT-101", "Zuschlag %", "Zuschlag"), 1, feld("BT-99", "oder Zuschlag €", "Zuschlag"),
+                1, feld("BT-104", "Grund", "Zuschlag"), 2));
+        nachlass.add(zeile(feld("OB-3", "Skonto Tage", "Skonto"), 1,
+                feld("OB-4", "Skonto %", "Skonto"), 1, new JPanel(), 2));
+        felder.get("BT-97").putClientProperty("JTextField.placeholderText", "Rabatt");
+        felder.get("BT-104").putClientProperty("JTextField.placeholderText", "z. B. Versand");
+        tipp("BT-94", "Rabatt auf die ganze Rechnung in Prozent der Positionssumme. Bei mehreren Steuersätzen wird er"
+                + " auf jeden Satz angewendet.");
+        tipp("BT-92", "Rabatt als fester Nettobetrag statt Prozent. Bei mehreren Steuersätzen wird er anteilig"
+                + " verteilt.");
+        tipp("BT-101", "Zuschlag auf die ganze Rechnung in Prozent der Positionssumme, z. B. Eilzuschlag.");
+        tipp("BT-99", "Zuschlag als fester Nettobetrag, z. B. Versand oder Verpackung. Bei mehreren Steuersätzen"
+                + " wird er anteilig verteilt.");
+        tipp("OB-3", "Skonto: Zahlt der Kunde innerhalb dieser Tage ab Rechnungsdatum, darf er den Prozentsatz"
+                + " abziehen. Steht im PDF und maschinenlesbar in der XRechnung.");
+        for (JComponent teil : new JComponent[] {zahlung, nachlass}) {
+            teil.setAlignmentX(LEFT_ALIGNMENT);
+        }
+        JPanel links = new JPanel();
+        links.setLayout(new BoxLayout(links, BoxLayout.Y_AXIS));
+        links.add(zahlung);
+        links.add(nachlass);
+
         JPanel unten = new JPanel(new GridLayout(1, 2, 40, 0));
-        unten.add(zahlung);
+        unten.add(links);
         unten.add(summen());
 
         JPanel seite = new JPanel();
@@ -170,7 +216,8 @@ final class Formular extends JPanel implements Scrollable {
         JPanel rahmen = new JPanel(new BorderLayout()) {
             @Override
             public Dimension getPreferredSize() {
-                return new Dimension(Math.min(1080, Math.max(680, Formular.this.getWidth() - 64)),
+                // Breite des Sichtbereichs, aber mindestens SCHMAL (sonst rollt die Seite waagrecht, siehe unten)
+                return new Dimension(Math.min(UIScale.scale(1080), Math.max(UIScale.scale(SCHMAL), platz())),
                         super.getPreferredSize().height);
             }
         };
@@ -202,15 +249,23 @@ final class Formular extends JPanel implements Scrollable {
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         JLabel l = new JLabel(titel);
         l.putClientProperty("FlatLaf.styleClass", "h3");
-        JPanel kopf = new JPanel(new BorderLayout());
+        JPanel kopf = new JPanel(new BorderLayout()) {
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(10, UIScale.scale(30));
+            }
+
+            @Override
+            public Dimension getMaximumSize() {
+                return new Dimension(Integer.MAX_VALUE, UIScale.scale(30));
+            }
+        };
         kopf.add(l, BorderLayout.WEST);
         if (rechts != null) {
             kopf.add(rechts, BorderLayout.EAST);
         }
-        kopf.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+        kopf.setBorder(rand(0, 0, 6, 0));
         kopf.setAlignmentX(LEFT_ALIGNMENT);
-        kopf.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        kopf.setPreferredSize(new Dimension(10, 30));
         p.add(kopf);
         return p;
     }
@@ -242,7 +297,7 @@ final class Formular extends JPanel implements Scrollable {
         l.setLabelFor(f);
         JPanel p = new JPanel(new BorderLayout(0, 3));
         p.add(l, BorderLayout.NORTH);
-        p.add(f instanceof JTextArea ? new JScrollPane(f) : f);
+        p.add(f instanceof JTextArea ? rollbar(f) : f);
         return p;
     }
 
@@ -250,6 +305,46 @@ final class Formular extends JPanel implements Scrollable {
         a.setLineWrap(true);
         a.setWrapStyleWord(true);
         return a;
+    }
+
+    /**
+     * Scrollbereich für ein mehrzeiliges Feld. Das Mausrad rollt das Feld nur, solange dort noch etwas zu rollen
+     * ist, sonst die ganze Seite. Ein normaler {@link JScrollPane} schluckt das Mausrad immer.
+     */
+    private static JScrollPane rollbar(JComponent inhalt) {
+        JScrollPane s = new JScrollPane(inhalt);
+        s.setWheelScrollingEnabled(false);
+        s.addMouseWheelListener(e -> {
+            JScrollBar b = s.getVerticalScrollBar();
+            boolean nachOben = e.getWheelRotation() < 0;
+            boolean kann = b.isVisible() && (nachOben ? b.getValue() > b.getMinimum()
+                    : b.getValue() + b.getVisibleAmount() < b.getMaximum());
+            if (kann) {
+                b.setValue(b.getValue() + e.getUnitsToScroll() * b.getUnitIncrement(nachOben ? -1 : 1));
+            } else {
+                s.getParent().dispatchEvent(SwingUtilities.convertMouseEvent(s, e, s.getParent()));
+            }
+        });
+        return s;
+    }
+
+    /**
+     * Leerer Rand, der mit der Schriftgröße (Zoom) wächst. Nicht {@code FlatEmptyBorder}: das ist eine UIResource,
+     * und {@code updateUI()} beim Wechsel von Design oder Größe würde ihn entfernen.
+     */
+    static Border rand(int oben, int links, int unten, int rechts) {
+        return new EmptyBorder(oben, links, unten, rechts) {
+            @Override
+            public Insets getBorderInsets(java.awt.Component c, Insets i) {
+                i.set(UIScale.scale(top), UIScale.scale(left), UIScale.scale(bottom), UIScale.scale(right));
+                return i;
+            }
+
+            @Override
+            public Insets getBorderInsets() {
+                return getBorderInsets(null, new Insets(0, 0, 0, 0));
+            }
+        };
     }
 
     /** Zurückhaltende Textfarbe, die beim Wechsel des Designs mitgeht. */
@@ -264,7 +359,12 @@ final class Formular extends JPanel implements Scrollable {
 
     /** Felder nebeneinander: abwechselnd Komponente und relative Breite. */
     private static JPanel zeile(Object... teile) {
-        JPanel p = new JPanel(new GridBagLayout());
+        JPanel p = new JPanel(new GridBagLayout()) {
+            @Override
+            public Dimension getMaximumSize() { // nur in der Breite dehnen, Höhe folgt der Schriftgröße
+                return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+            }
+        };
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.HORIZONTAL;
         for (int i = 0; i < teile.length; i += 2) {
@@ -273,21 +373,42 @@ final class Formular extends JPanel implements Scrollable {
             p.add((JComponent) teile[i], c);
         }
         p.setAlignmentX(LEFT_ALIGNMENT);
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, p.getPreferredSize().height));
         return p;
     }
 
-    private static JButton knopf(String text, Runnable aktion) {
-        JButton b = new JButton(text);
-        b.putClientProperty("JButton.buttonType", "borderless");
-        b.putClientProperty("FlatLaf.styleClass", "small");
-        b.setFocusable(false);
-        b.addActionListener(e -> aktion.run());
-        return b;
+    /** Adressbuch-Knöpfe, beschriftet und so hoch wie ein Eingabefeld. */
+    private static JComponent adressbuch(Runnable aus, Runnable ins) {
+        JPanel knoepfe = new JPanel(new GridLayout(1, 2, 12, 0));
+        // kurze Beschriftungen, „Adressbuch“ steht schon darüber; so passen sie auch bei großer Schrift ganz hinein
+        String[][] knopf = {{"Auswählen…", "Empfänger aus dem Adressbuch übernehmen"},
+                {"Speichern", "Diesen Empfänger im Adressbuch speichern"}};
+        for (String[] k : knopf) {
+            JButton b = new JButton(k[0]) {
+                @Override
+                public Dimension getPreferredSize() {
+                    return new Dimension(10, new JTextField().getPreferredSize().height);
+                }
+
+                @Override
+                public Dimension getMinimumSize() { // Breite gibt das Raster vor, nicht der Text
+                    return getPreferredSize();
+                }
+            };
+            b.setToolTipText(k[1]);
+            b.setFocusable(false);
+            knoepfe.add(b);
+        }
+        ((JButton) knoepfe.getComponent(0)).addActionListener(e -> aus.run());
+        ((JButton) knoepfe.getComponent(1)).addActionListener(e -> ins.run());
+        JLabel l = gedaempft(new JLabel("Adressbuch"));
+        l.putClientProperty("FlatLaf.styleClass", "small");
+        JPanel p = new JPanel(new BorderLayout(0, 3));
+        p.add(l, BorderLayout.NORTH);
+        p.add(knoepfe);
+        return p;
     }
 
     private JComponent positionsteil() {
-        tabelle.setRowHeight(30);
         tabelle.setShowHorizontalLines(true);
         tabelle.setFillsViewportHeight(true);
         tabelle.putClientProperty("terminateEditOnFocusLost", true);
@@ -297,13 +418,19 @@ final class Formular extends JPanel implements Scrollable {
         tabelle.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         int[] breiten = {44, 420, 70, 100, 110, 150, 110};
         for (int i = 0; i < breiten.length; i++) {
-            tabelle.getColumnModel().getColumn(i).setPreferredWidth(breiten[i]);
+            spaltenBreiten.put(tabelle.getColumnModel().getColumn(i), breiten[i]);
         }
         DefaultTableCellRenderer rechts = new DefaultTableCellRenderer();
         rechts.setHorizontalAlignment(SwingConstants.RIGHT);
         for (int spalte : new int[] {MENGE, PREIS, BETRAG_SPALTE}) {
             tabelle.getColumnModel().getColumn(spalte).setCellRenderer(rechts);
         }
+        // Rabatt (BT-138) steht im Modell hinten, in der Ansicht vor dem Betrag
+        var rabatt = tabelle.getColumnModel().getColumn(tabelle.convertColumnIndexToView(RABATT));
+        spaltenBreiten.put(rabatt, 80);
+        spaltenBreiten.forEach((spalte, breite) -> spalte.setPreferredWidth(UIScale.scale(breite)));
+        rabatt.setCellRenderer(rechts);
+        tabelle.moveColumn(tabelle.convertColumnIndexToView(RABATT), tabelle.convertColumnIndexToView(BETRAG_SPALTE));
         tabelle.getColumnModel().getColumn(EINHEIT).setCellEditor(auswahl(EINHEITEN, List.of()));
         tabelle.getColumnModel().getColumn(STEUER).setCellEditor(auswahl(STEUERN, List.of("19 %", "7 %", "0 %")));
         positionen.addTableModelListener(e -> {
@@ -332,7 +459,7 @@ final class Formular extends JPanel implements Scrollable {
         JButton neu = new JButton("Position hinzufügen");
         neu.addActionListener(e -> {
             positionen.addRow(new Object[] {String.valueOf(positionen.getRowCount() + 1), "", "1", "Stück", "",
-                "19 %", "", null, null});
+                "19 %", "", null, null, ""});
             int zeile = positionen.getRowCount() - 1;
             tabelle.changeSelection(zeile, TEXT, false, false);
             tabelle.editCellAt(zeile, TEXT);
@@ -350,7 +477,7 @@ final class Formular extends JPanel implements Scrollable {
         knoepfe.add(neu);
         knoepfe.add(Box.createHorizontalStrut(8));
         knoepfe.add(weg);
-        knoepfe.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        knoepfe.setBorder(rand(10, 0, 0, 0));
 
         // ausführlicher Text (BT-154) zur gerade gewählten Position
         mehrzeilig(beschreibung).setEnabled(false);
@@ -384,9 +511,9 @@ final class Formular extends JPanel implements Scrollable {
         JLabel titel = gedaempft(new JLabel("Beschreibung der gewählten Position (optional, mehrzeilig)"));
         titel.putClientProperty("FlatLaf.styleClass", "small");
         JPanel detail = new JPanel(new BorderLayout(0, 3));
-        detail.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        detail.setBorder(rand(12, 0, 0, 0));
         detail.add(titel, BorderLayout.NORTH);
-        detail.add(new JScrollPane(beschreibung));
+        detail.add(rollbar(beschreibung));
 
         JPanel p = abschnitt("Positionen", null);
         for (JComponent teil : new JComponent[] {rahmen, knoepfe, detail}) {
@@ -411,7 +538,7 @@ final class Formular extends JPanel implements Scrollable {
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(4, 24, 4, 0);
         c.anchor = GridBagConstraints.EAST;
-        gesamt.setFont(gesamt.getFont().deriveFont(Font.BOLD, gesamt.getFont().getSize2D() + 5));
+        gesamt.putClientProperty("FlatLaf.style", "font: bold +5"); // als Stil, damit es dem Zoom folgt
         String[] texte = {"Netto", "Umsatzsteuer", "Rechnungsbetrag"};
         JLabel[] werte = {netto, steuer, gesamt};
         for (int i = 0; i < 3; i++) {
@@ -448,7 +575,8 @@ final class Formular extends JPanel implements Scrollable {
         for (String[] z : e.positionen()) {
             BigDecimal preis = zahl(z[4]);
             positionen.addRow(new Object[] {z[0], z[1], z[2], einheit(z[3], 1, 0),
-                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5], z[8]});
+                preis != null ? BETRAG.format(preis) : z[4], steuerText(z[6], z[7]), "", z[5], z[8],
+                z.length > 9 ? z[9] : null});
         }
         laedt = false;
         rechne();
@@ -465,7 +593,7 @@ final class Formular extends JPanel implements Scrollable {
             if (f.getText().isBlank()) {
                 d.remove(bt);
             } else {
-                d.put(bt, f.getText().strip());
+                d.put(bt, ZAHLEN.contains(bt) ? normal(f.getText().strip()) : f.getText().strip());
             }
         });
         // ohne eigene E-Rechnungs-Adresse gilt die E-Mail; das Schema folgt aus der Form der Adresse
@@ -483,7 +611,7 @@ final class Formular extends JPanel implements Scrollable {
             String[] st = steuer(wert(i, STEUER));
             zeilen.add(new String[] {wert(i, POS), wert(i, TEXT), normal(wert(i, MENGE)),
                 einheit(wert(i, EINHEIT), 0, 1), normal(wert(i, PREIS)), wert(i, BASIS), st[0], st[1],
-                wert(i, BESCHREIBUNG)});
+                wert(i, BESCHREIBUNG), normal(wert(i, RABATT))});
         }
         return new Entwurf(d, zeilen);
     }
@@ -563,7 +691,7 @@ final class Formular extends JPanel implements Scrollable {
             try {
                 if (menge != null && preis != null) {
                     ps.add(new Position("", "", menge, "", preis, zahl(wert(i, BASIS)),
-                            Steuerkategorie.valueOf(st[0]), zahl(st[1])));
+                            Steuerkategorie.valueOf(st[0]), zahl(st[1]), null, zahl(wert(i, RABATT))));
                     zeilen.add(i);
                 }
             } catch (RuntimeException unvollstaendig) {
@@ -582,7 +710,7 @@ final class Formular extends JPanel implements Scrollable {
             gesamt.setText("–");
         } else {
             var erg = Berechnung.berechne(new Rechnung(null, null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, ps));
+                    null, null, null, null, null, ps).mit(abschlaegeZuschlaege(), null));
             for (int i = 0; i < zeilen.size(); i++) {
                 positionen.setValueAt(BETRAG.format(erg.zeilenbetraege().get(i)), zeilen.get(i), BETRAG_SPALTE);
             }
@@ -593,6 +721,23 @@ final class Formular extends JPanel implements Scrollable {
         laedt = vorher;
     }
 
+    /** Rabatt und Zuschlag auf die ganze Rechnung, soweit schon gültig eingegeben; für die Summen im Formular. */
+    private List<Rechnung.AbschlagZuschlag> abschlaegeZuschlaege() {
+        List<Rechnung.AbschlagZuschlag> liste = new ArrayList<>();
+        for (String[] k : new String[][] {{"BT-94", "BT-92", "BT-97", ""}, {"BT-101", "BT-99", "BT-104", "z"}}) {
+            try {
+                BigDecimal p = zahl(felder.get(k[0]).getText());
+                BigDecimal b = zahl(felder.get(k[1]).getText());
+                if (p != null || b != null) {
+                    liste.add(new Rechnung.AbschlagZuschlag(!k[3].isEmpty(), p, b, null));
+                }
+            } catch (IllegalArgumentException unvollstaendig) {
+                // zählt erst, wenn die Eingabe stimmt; die Prüfung meldet den Fehler
+            }
+        }
+        return liste;
+    }
+
     // ------------------------------------------------------------ Umrechnung Anzeige ↔ Datei
 
     /** Deutsche Zahl: {@code 3.000,50}, {@code 3000,5}, {@code 3.000}; ein einzelner Punkt gilt als Komma. */
@@ -600,7 +745,7 @@ final class Formular extends JPanel implements Scrollable {
         if (s == null || s.isBlank()) {
             return null;
         }
-        s = s.replace(" ", "").replace("€", "");
+        s = s.replace(" ", "").replace("€", "").replace("%", "");
         if (s.contains(",") || s.matches("\\d{1,3}(\\.\\d{3})+")) {
             s = s.replace(".", "").replace(',', '.');
         }
@@ -667,7 +812,7 @@ final class Formular extends JPanel implements Scrollable {
 
     @Override
     public int getScrollableUnitIncrement(Rectangle sichtbar, int richtung, int vorzeichen) {
-        return 24;
+        return UIScale.scale(24);
     }
 
     @Override
@@ -677,7 +822,15 @@ final class Formular extends JPanel implements Scrollable {
 
     @Override
     public boolean getScrollableTracksViewportWidth() {
-        return true;
+        // Bei großer Schrift in kleinem Fenster lieber waagrecht rollen, als Felder zu stauchen und Text zu kürzen
+        return platz() >= UIScale.scale(SCHMAL);
+    }
+
+    /** Breite für den Inhalt: Sichtbereich (Viewport) abzüglich Rand, nicht die eigene, evtl. breitere Größe. */
+    private int platz() {
+        Insets rand = getInsets();
+        int breite = getParent() != null ? getParent().getWidth() : getWidth();
+        return breite - rand.left - rand.right;
     }
 
     @Override

@@ -215,6 +215,17 @@ Die komplette Liste steht in `common.sch` (`CEF-EAS-CODES`). Die Extension erlau
 | BR-CO-26 | Mindestens eines von BT-29, BT-30 oder BT-31 (Verkäuferkennung) |
 | BR-45 ff. | Für jede vorkommende (Kategorie, Satz)-Kombination genau eine BG-23 |
 
+### 5.1 Abschläge, Zuschläge und Skonto in CII
+
+Geprüft am 23.11.2026 mit KoSIT 1.6.3 und der Konfiguration 2026-08-31 (`CiiSchreiberTest`).
+
+- **Element:** `ram:SpecifiedTradeAllowanceCharge` mit der Reihenfolge `ChargeIndicator/udt:Indicator` (`false` Abschlag, `true` Zuschlag), `CalculationPercent`, `BasisAmount`, `ActualAmount`, `ReasonCode`, `Reason`, `CategoryTradeTax`.
+- **Position (BG-27/28):** in `SpecifiedLineTradeSettlement` nach `ApplicableTradeTax` (und `BillingSpecifiedPeriod`), vor `SpecifiedTradeSettlementLineMonetarySummation`. Ohne `CategoryTradeTax`. Grund (BT-139/144) oder Code (BT-140/145) ist Pflicht (BR-42/BR-44).
+- **Beleg (BG-20/21):** in `ApplicableHeaderTradeSettlement` nach `ApplicableTradeTax` (BG-23) und `BillingSpecifiedPeriod`, vor `SpecifiedTradePaymentTerms`. `CategoryTradeTax` mit `TypeCode` VAT, `CategoryCode` (BT-95/102, BR-32/BR-37) und `RateApplicablePercent` (außer bei O). Grund oder Code ist Pflicht (BR-33/BR-38).
+- **Summen:** In `SpecifiedTradeSettlementHeaderMonetarySummation` stehen `ChargeTotalAmount` (BT-108) und `AllowanceTotalAmount` (BT-107) in dieser Reihenfolge zwischen `LineTotalAmount` und `TaxBasisTotalAmount`.
+- **Kategorie O** darf nicht mit anderen Kategorien in einer Rechnung stehen (BR-O-11 ff.); ein Test mit S und O zusammen ist daher kein gültiges Beispiel. S zusammen mit E geht.
+- **Skonto (BR-DE-18, fatal):** Regex im Schematron (`XR-SKONTO-REGEX` in `XRechnung-CII-validation.xsl`): `#SKONTO#TAGE=([0-9]+#PROZENT=[0-9]+\.[0-9]{2})(#BASISBETRAG=-?[0-9]+\.[0-9]{2})?#`. Geprüft wird nur die erste `ram:Description` in `SpecifiedTradePaymentTerms`. Jede Zeile, die mit `#` beginnt, muss der Regex genügen, und **nach dem letzten `#…#` muss ein Zeilenumbruch folgen**. Der Prozentsatz braucht genau zwei Nachkommastellen (`2.00`, nicht `2`). Freitext darf davor stehen, aber keine Freitextzeile darf mit `#` beginnen. Die Tage zählen ab Rechnungsdatum (unverifiziert gegen den Spezifikationstext).
+
 Bruttopreise wie im Einzelhandel sieht EN 16931 nicht vor. Das BMF bestätigt im Schreiben vom 15.10.2026, dass dabei Rundungsdifferenzen entstehen können. openbilling sollte deshalb Nettopreise speichern.
 
 ---

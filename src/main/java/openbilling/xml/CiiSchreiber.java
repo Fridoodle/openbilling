@@ -8,6 +8,7 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 import openbilling.model.Berechnung;
+import openbilling.model.Berechnung.Belegposten;
 import openbilling.model.Berechnung.Ergebnis;
 import openbilling.model.Berechnung.Steuergruppe;
 import openbilling.model.Rechnung;
@@ -87,7 +88,7 @@ public final class CiiSchreiber {
 
         w.writeStartElement(RSM, "SupplyChainTradeTransaction");
         for (int i = 0; i < r.positionen().size(); i++) {
-            position(r.positionen().get(i), e.zeilenbetraege().get(i));
+            position(r.positionen().get(i), i);
         }
         vereinbarung();
         lieferung();
@@ -99,7 +100,7 @@ public final class CiiSchreiber {
     }
 
     /** BG-25 */
-    private void position(Position p, BigDecimal zeilenbetrag) throws XMLStreamException {
+    private void position(Position p, int i) throws XMLStreamException {
         start("IncludedSupplyChainTradeLineItem");
         start("AssociatedDocumentLineDocument");
         text("LineID", p.id()); // BT-126
@@ -135,8 +136,17 @@ public final class CiiSchreiber {
             text("RateApplicablePercent", satz(p.steuersatz())); // BT-152
         }
         end();
+        if (p.rabatt() != null) { // BG-27 Zeilenabschlag
+            start("SpecifiedTradeAllowanceCharge");
+            indikator(false);
+            text("CalculationPercent", satz(p.rabatt())); // BT-138
+            text("BasisAmount", e.grundbetraege().get(i).toPlainString()); // BT-137
+            text("ActualAmount", e.zeilenrabatte().get(i).toPlainString()); // BT-136
+            text("Reason", "Rabatt"); // BT-139, BR-42
+            end();
+        }
         start("SpecifiedTradeSettlementLineMonetarySummation");
-        text("LineTotalAmount", zeilenbetrag.toPlainString()); // BT-131
+        text("LineTotalAmount", e.zeilenbetraege().get(i).toPlainString()); // BT-131
         end();
         end();
         end();
@@ -266,10 +276,30 @@ public final class CiiSchreiber {
             end();
         }
 
-        if (r.zahlungsbedingungen() != null || r.faelligAm() != null) {
+        for (Belegposten b : e.belegposten()) { // BG-20 / BG-21
+            start("SpecifiedTradeAllowanceCharge");
+            indikator(b.zuschlag());
+            if (b.prozent() != null) {
+                text("CalculationPercent", satz(b.prozent())); // BT-94 / BT-101
+                text("BasisAmount", b.basis().toPlainString()); // BT-93 / BT-100
+            }
+            text("ActualAmount", b.betrag().toPlainString()); // BT-92 / BT-99
+            text("Reason", b.grund()); // BT-97 / BT-104, BR-33 / BR-38
+            start("CategoryTradeTax");
+            text("TypeCode", "VAT");
+            text("CategoryCode", b.kategorie().name()); // BT-95 / BT-102
+            if (b.kategorie() != Steuerkategorie.O) {
+                text("RateApplicablePercent", b.satz().toPlainString()); // BT-96 / BT-103
+            }
+            end();
+            end();
+        }
+
+        String bedingungen = zahlungsbedingungen(r);
+        if (bedingungen != null || r.faelligAm() != null) {
             start("SpecifiedTradePaymentTerms");
-            if (r.zahlungsbedingungen() != null) {
-                text("Description", r.zahlungsbedingungen()); // BT-20
+            if (bedingungen != null) {
+                text("Description", bedingungen); // BT-20
             }
             if (r.faelligAm() != null) {
                 datum("DueDateDateTime", r.faelligAm()); // BT-9
@@ -279,6 +309,10 @@ public final class CiiSchreiber {
 
         start("SpecifiedTradeSettlementHeaderMonetarySummation"); // BG-22
         text("LineTotalAmount", e.summeZeilen().toPlainString()); // BT-106
+        if (!e.belegposten().isEmpty()) {
+            text("ChargeTotalAmount", e.zuschlaege().toPlainString()); // BT-108
+            text("AllowanceTotalAmount", e.abschlaege().toPlainString()); // BT-107
+        }
         text("TaxBasisTotalAmount", e.netto().toPlainString()); // BT-109
         start("TaxTotalAmount"); // BT-110
         w.writeAttribute("currencyID", r.waehrung());
@@ -299,6 +333,29 @@ public final class CiiSchreiber {
         w.writeStartElement(UDT, "DateTimeString");
         w.writeAttribute("format", "102");
         w.writeCharacters(d.format(FORMAT_102));
+        w.writeEndElement();
+        end();
+    }
+
+    /**
+     * BT-20: Freitext und danach je Skonto eine Zeile {@code #SKONTO#TAGE=14#PROZENT=2.00#}. BR-DE-18 verlangt,
+     * dass jede mit {@code #} beginnende Zeile dieser Syntax folgt und nach der letzten ein Zeilenumbruch steht.
+     */
+    public static String zahlungsbedingungen(Rechnung r) {
+        String text = r.zahlungsbedingungen();
+        if (r.skonto() == null) {
+            return text;
+        }
+        String zeile = "#SKONTO#TAGE=" + r.skonto().tage() + "#PROZENT="
+                + r.skonto().prozent().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() + "#\n";
+        return text == null ? zeile : text.strip() + "\n" + zeile;
+    }
+
+    /** {@code ram:ChargeIndicator}: {@code true} Zuschlag, {@code false} Abschlag. */
+    private void indikator(boolean zuschlag) throws XMLStreamException {
+        start("ChargeIndicator");
+        w.writeStartElement(UDT, "Indicator");
+        w.writeCharacters(String.valueOf(zuschlag));
         w.writeEndElement();
         end();
     }

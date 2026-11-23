@@ -2,10 +2,14 @@ package openbilling.config;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import openbilling.ods.RechnungOds;
 
 /**
@@ -22,6 +26,15 @@ public final class Einstellungen {
 
     /** BT-24 für neue Vorlagen. */
     public static final String SPEZIFIKATION = "xrechnung.spezifikation";
+
+    /** Zuletzt exportierte Rechnungsnummer, Grundlage für den nächsten Vorschlag. */
+    public static final String LETZTE_NUMMER = "rechnungsnummer.letzte";
+
+    /** Rechnungsnummer: alles davor, letzte Ziffernfolge (der Zähler), alles danach ohne Ziffern. */
+    private static final Pattern ZAEHLER = Pattern.compile("(.*?)(\\d+)(\\D*)");
+
+    /** Jahreszahl im Teil vor dem Zähler, z. B. RE-2026-. */
+    private static final Pattern JAHR = Pattern.compile("(?<!\\d)((?:19|20)\\d{2})(?!\\d)");
 
     private final Path ordner;
     private final Properties werte = new Properties();
@@ -108,6 +121,55 @@ public final class Einstellungen {
             // kein JAR-Pfad ermittelbar: bei der Vorgabe bleiben
         }
         return entwicklung;
+    }
+
+    /**
+     * Vorschlag für die nächste Rechnungsnummer (BT-1): die zuletzt exportierte Nummer plus eins, mit gleicher
+     * Stellenzahl. Enthält sie ein früheres Jahr, beginnt die Zählung im neuen Jahr bei 1. Ohne bisherigen Export
+     * {@code JJJJ-001}.
+     */
+    public String naechsteNummer(LocalDate heute) {
+        return naechste(werte.getProperty(LETZTE_NUMMER), heute.getYear());
+    }
+
+    /**
+     * Merkt sich eine exportierte Rechnungsnummer als Grundlage für {@link #naechsteNummer}. Eine kleinere Nummer
+     * desselben Schemas (z. B. ein erneuter Export einer alten Rechnung) ändert nichts.
+     */
+    public void merkeNummer(String nummer) throws IOException {
+        String letzte = werte.getProperty(LETZTE_NUMMER);
+        if (nummer == null || nummer.isBlank() || nummer.equals(letzte)) {
+            return;
+        }
+        Matcher neu = ZAEHLER.matcher(nummer);
+        Matcher alt = letzte == null ? null : ZAEHLER.matcher(letzte);
+        if (alt != null && neu.matches() && alt.matches() && neu.group(1).equals(alt.group(1))
+                && new BigInteger(neu.group(2)).compareTo(new BigInteger(alt.group(2))) <= 0) {
+            return;
+        }
+        setze(LETZTE_NUMMER, nummer.strip());
+    }
+
+    static String naechste(String letzte, int jahr) {
+        if (letzte == null || letzte.isBlank()) {
+            return jahr + "-001";
+        }
+        Matcher m = ZAEHLER.matcher(letzte.strip());
+        if (!m.matches()) {
+            return letzte.strip() + "-1";
+        }
+        String vorn = m.group(1);
+        String zahl = m.group(2);
+        Matcher j = JAHR.matcher(vorn);
+        String fortlaufend;
+        if (j.find() && Integer.parseInt(j.group(1)) < jahr) {
+            vorn = vorn.substring(0, j.start(1)) + jahr + vorn.substring(j.end(1));
+            fortlaufend = "1";
+        } else {
+            fortlaufend = new BigInteger(zahl).add(BigInteger.ONE).toString();
+        }
+        String nullen = "0".repeat(Math.max(0, zahl.length() - fortlaufend.length()));
+        return vorn + nullen + fortlaufend + m.group(3);
     }
 
     public String spezifikation() {
