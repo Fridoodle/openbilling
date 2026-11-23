@@ -6,7 +6,7 @@
 
   <groupId>io.github.fridoodle</groupId>
   <artifactId>openbilling</artifactId>
-  <version>0.1.2</version>
+  <version>0.1.3</version>
   <name>openbilling</name>
   <description>E-Rechnungen nach XRechnung aus OpenDocument-Tabellen</description>
   <url>https://github.com/Fridoodle/openbilling</url>
