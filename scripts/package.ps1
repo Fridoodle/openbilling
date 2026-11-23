@@ -1,7 +1,9 @@
-﻿# Baut das portable Windows-Paket: dist\openbilling-<version>-windows-x64.zip
+﻿# Baut die Windows-Pakete: dist\openbilling-<version>-windows-x64.zip (portabel) und
+# dist\openbilling-<version>-windows-x64-setup.exe (Installer, Inno Setup, packaging\openbilling.iss).
 # Inhalt: openbilling.exe (Fenster), openbilling-cli.exe (Kommandozeile), eigene Java-Laufzeit,
 # alle Bibliotheken und die KoSIT-Konfiguration. Auf dem Zielrechner muss nichts installiert sein.
-# Voraussetzung: JDK 21 mit jpackage, .\scripts\setup-maven.ps1 und .\scripts\setup-validator.ps1.
+# Voraussetzung: JDK 21 mit jpackage, .\scripts\setup-maven.ps1, .\scripts\setup-validator.ps1 und
+# Inno Setup 6 (winget install JRSoftware.InnoSetup --scope user).
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
@@ -10,6 +12,10 @@ $version = ([xml](Get-Content pom.xml -Raw)).project.version
 if ($version -like '*-SNAPSHOT') { throw "Version $version ist ein SNAPSHOT. Für ein Release in pom.xml setzen." }
 $cfg = 'tools\kosit\config'
 if (-not (Test-Path "$cfg\scenarios.xml")) { throw "$cfg fehlt. Erst .\scripts\setup-validator.ps1 ausführen." }
+$iscc = @((Get-Command iscc.exe -ErrorAction SilentlyContinue).Source,
+          "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+          "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $iscc) { throw 'Inno Setup 6 fehlt. winget install JRSoftware.InnoSetup --scope user' }
 
 & .\tools\maven\bin\mvn.cmd -q clean package
 if ($LASTEXITCODE -ne 0) { throw 'Maven-Build fehlgeschlagen' }
@@ -58,6 +64,13 @@ New-Item -ItemType Directory -Force dist | Out-Null
 $zip = "dist\openbilling-$version-windows-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive "$bild\openbilling" $zip
-$hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-Set-Content "$zip.sha256" "$hash  $(Split-Path $zip -Leaf)" -Encoding ascii
-Write-Host "Fertig: $zip ($([math]::Round((Get-Item $zip).Length / 1MB)) MB), SHA-256 $hash"
+
+& $iscc /Q "/DVersion=$version" "/DBild=$root\$bild\openbilling" packaging\openbilling.iss
+if ($LASTEXITCODE -ne 0) { throw 'Inno Setup fehlgeschlagen' }
+$setup = "dist\openbilling-$version-windows-x64-setup.exe"
+
+foreach ($datei in $zip, $setup) {
+    $hash = (Get-FileHash $datei -Algorithm SHA256).Hash.ToLower()
+    Set-Content "$datei.sha256" "$hash  $(Split-Path $datei -Leaf)" -Encoding ascii
+    Write-Host "Fertig: $datei ($([math]::Round((Get-Item $datei).Length / 1MB)) MB), SHA-256 $hash"
+}
