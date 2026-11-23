@@ -106,6 +106,13 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Signatur:** Noch keine. Die README erklärt „Weitere Informationen → Trotzdem ausführen“ und die SHA-256-Prüfsumme. Für Open-Source-Projekte signiert die SignPath Foundation kostenlos über GitHub Actions; Alternative ist Azure Artifact Signing (kostenpflichtig, Zulassungsbedingungen für Einzelpersonen unverifiziert). Erst mit Signatur lohnt sich auch ein Installer.
 - **Konsequenzen:** Updates heißen: neues ZIP entpacken, alten Ordner löschen. Nutzerdaten liegen in `%APPDATA%\openbilling\` und bleiben erhalten. Das Paket ist nur für Windows x64; für Linux und macOS müsste `package.ps1` auf dem jeweiligen System laufen (jpackage baut nicht plattformübergreifend).
 
+## 2026-11-23 — Lizenz GPL-3.0
+
+- **Kontext:** Vor dem ersten Release brauchte das Projekt eine Lizenz, sonst ist es rechtlich nicht Open Source. Der Nutzer wollte Copyleft: Veränderte Fassungen sollen offen bleiben.
+- **Entscheidung:** openbilling steht unter **GPL-3.0-only** (`LICENSE`, offizieller Text von https://www.gnu.org/licenses/gpl-3.0.txt, `<licenses>` in `pom.xml`).
+- **Verträglichkeit geprüft** mit `license-maven-plugin` über alle 68 mitgelieferten Bibliotheken: Apache-2.0 (die meisten, u. a. Mustang, KoSIT, FlatLaf, FOP, Batik, PDFBox, ph-*), EDL 1.0 bzw. BSD-3 (Jakarta/JAXB), MIT, MPL-2.0 (Saxon-HE) und Unlicense (SODS). Alle dürfen in GPL-3-Software. Apache-2.0 ist mit GPL-3 verträglich, nicht aber mit GPL-2. Die mitgelieferte Temurin-Laufzeit steht unter GPL-2.0 mit Classpath Exception und darf mitgegeben werden.
+- **Konsequenzen:** Jede neue Bibliothek muss GPL-3-verträglich sein. Ausgeschlossen sind zum Beispiel EPL-1.0, CDDL-1.0 und proprietäre Lizenzen. `scripts/package.ps1` legt `LICENSE.txt` und `DRITTANBIETER.txt` (Liste aller Bibliotheken mit Lizenz) ins Paket. Die NOTICE-Dateien der Apache-Bibliotheken liegen in deren JARs unter `META-INF/`. Den Quelltext bietet das öffentliche Repo neben den Release-Dateien an (GPL-3 §6). Lizenzköpfe in den einzelnen Quelldateien gibt es bisher nicht.
+
 ## Offen
 
 - Automatische Rechnungsnummer (Nummernschema und Zähler). Bisher trägt man die Nummer von Hand ein.
