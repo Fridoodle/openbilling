@@ -17,7 +17,7 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 ## 2026-11-23 — Java 21 statt Rust
 
 - **Kontext:** Der schwierige Teil von openbilling ist nicht das Programm selbst, sondern eine gültige XRechnung-XML, ein PDF/A-3 mit korrekter Factur-X-Einbettung (XMP-Extension-Schema, `/AF`, AFRelationship) und deren Prüfung. Die fertigen Werkzeuge dafür gibt es fast nur in Java: Mustangproject (CII, ZUGFeRD 2.5, PDF/A-3, Einbettung, Validierung) und der offizielle KoSIT-Validator. In Rust müsste die Factur-X-Einbettung selbst gebaut werden, und für die Validierung bräuchte das Programm zur Laufzeit trotzdem Java.
-- **Entscheidung:** Java 21 (LTS), Build mit Maven, Auslieferung später per `jpackage` als Installer mit eigener JRE. Minimalismus gilt weiter: kein Framework (kein Spring), Swing statt JavaFX, jede Bibliothek wird hier begründet.
+- **Entscheidung:** Java 21 (LTS), Build mit Maven, Auslieferung später per `jpackage` als Installer mit eigener JRE (umgesetzt als portables ZIP, siehe „Auslieferung als portables ZIP“). Minimalismus gilt weiter: kein Framework (kein Spring), Swing statt JavaFX, jede Bibliothek wird hier begründet.
 - **Konsequenzen:** Das Installationspaket wird größer (geschätzt 50–70 MB inklusive JRE, unverifiziert). Dafür kann die App jede XML **vor dem Export selbst mit dem KoSIT-Validator prüfen** und dem Nutzer Regel-IDs anzeigen. Geplante Bibliotheken: `org.mustangproject:library`, `org.kosit:validator`, SODS (ODS), openhtmltopdf (HTML → PDF/A-3), JUnit 5 für Tests. Jede wird beim Einbinden einzeln bestätigt.
 
 ## 2026-11-23 — ODS mit Schlüssel/Wert-Blättern statt Zellkoordinaten
@@ -97,9 +97,16 @@ Kurz-ADRs. Format: `## YYYY-MM-DD — Titel` · Kontext · Entscheidung · Konse
 - **Datenvertrag:** Felder ohne EN-16931-Gegenstück bekommen die Kennung `OB-n` (openbilling) und werden im Blatt `Daten` wie BT-Felder gelesen (`RechnungOds.kennung` erkennt `BT-` und `OB-`). Neu ist die optionale Zeile `OB-1 Schlussformel`. Ältere Dateien ohne diese Zeile bleiben lesbar.
 - **Vorlagen überschreiben:** „Als Vorlage speichern“ zeigt eine bearbeitbare Auswahlliste der vorhandenen Vorlagen. Vorgeschlagen ist die Vorlage, aus der die offene Rechnung entstanden ist. Wählt man eine vorhandene, wird sie nach Rückfrage ersetzt. Eine Vorlage ändert man also so: Rechnung aus ihr erstellen, anpassen, als dieselbe Vorlage speichern. Die Schlussformel wird mit der Vorlage gespeichert und gilt dann für jede neue Rechnung.
 
-## Offen
+## 2026-11-23 — Auslieferung als portables ZIP mit eigener Java-Laufzeit
 
-- Validator-Konfiguration mit der App ausliefern (als Ressource im JAR oder beim ersten Start nach `%APPDATA%` entpacken).
+- **Kontext:** Nutzer sollen openbilling ohne Java-Installation, ohne Administratorrechte und ohne Fachwissen starten können. Das Programm braucht zur Laufzeit 63 Bibliotheks-JARs und die KoSIT-Konfiguration. Unsignierte Programme lösen unter Windows SmartScreen-Warnungen und manchmal Fehlalarme von Virenscannern aus.
+- **Entscheidung:** `scripts/package.ps1` baut mit `jpackage` (Teil des JDK, keine neue Abhängigkeit) ein App-Image und packt es als `dist/openbilling-<version>-windows-x64.zip` samt `.sha256`. Das Paket enthält `openbilling.exe` (Fenster), `openbilling-cli.exe` (zweiter Starter mit Konsole, `--add-launcher` mit `win-console=true`), eine per jlink gekürzte Java-21-Laufzeit, `app/lib/` und `app/kosit/config/`. Ein Installer (MSI/EXE) kommt vorerst nicht: Er bräuchte das WiX Toolset als zusätzliches Build-Werkzeug (JDK 21 unterstützt nur WiX 3), Administratorrechte beim Nutzer und hilft nicht gegen SmartScreen, weil auch ein Installer ohne Signatur gewarnt wird.
+- **Validator-Konfiguration:** `Einstellungen.kositKonfiguration()` sucht in dieser Reihenfolge: Einstellung `kosit.konfiguration`, `tools/kosit/config` im Arbeitsverzeichnis (Entwicklung), `kosit/config` neben `openbilling.jar` (Paket). Damit ist der offene Punkt „Validator-Konfiguration mit der App ausliefern“ erledigt. Die Konfiguration steht unter Apache-2.0 und darf weitergegeben werden.
+- **Laufzeitmodule:** Die Modulliste steht im Skript. Sie stammt aus `jdeps --print-module-deps` plus Modulen, die erst zur Laufzeit geladen werden (u. a. `jdk.localedata` für deutsche Formate, `jdk.charsets`, `jdk.crypto.ec`, `java.naming`, `java.xml.crypto`). Ob alle Zusatzmodule nötig sind, ist (unverifiziert); geprüft ist nur, dass Export und Fenster damit laufen. Größe: ZIP 79 MB, entpackt 162 MB (mit vollem JDK 95 bzw. 202 MB).
+- **Signatur:** Noch keine. Die README erklärt „Weitere Informationen → Trotzdem ausführen“ und die SHA-256-Prüfsumme. Für Open-Source-Projekte signiert die SignPath Foundation kostenlos über GitHub Actions; Alternative ist Azure Artifact Signing (kostenpflichtig, Zulassungsbedingungen für Einzelpersonen unverifiziert). Erst mit Signatur lohnt sich auch ein Installer.
+- **Konsequenzen:** Updates heißen: neues ZIP entpacken, alten Ordner löschen. Nutzerdaten liegen in `%APPDATA%\openbilling\` und bleiben erhalten. Das Paket ist nur für Windows x64; für Linux und macOS müsste `package.ps1` auf dem jeweiligen System laufen (jpackage baut nicht plattformübergreifend).
+
+## Offen
 
 - Automatische Rechnungsnummer (Nummernschema und Zähler). Bisher trägt man die Nummer von Hand ein.
 - Bedienung des Fensters (Menüs, Dialoge, Kalender, Export) ist bisher nur offscreen gerendert und über die Tests der Datenschicht geprüft, nicht von Hand durchgeklickt (unverifiziert).

@@ -98,3 +98,23 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Aufbau:** `new FopFactoryBuilder(basisUri, new ClasspathResolverURIAdapter()).setConfiguration(new DefaultConfigurationBuilder().build(strom))` mit `fop-config.xconf` aus dem Mustang-JAR, danach denselben Resolver am `FontManager` setzen, sonst findet FOP die Schriften unter `classpath:fonts/…` nicht. PDF/A über `agent.getRendererOptions().put("pdf-a-mode", "PDF/A-3b")`. So macht es auch Mustang selbst.
 - **Stolperfallen:** Die Konfiguration hat `strict-validation`, also keine leere `fo:table-body` und in jeder `fo:table-cell` ein Block. FO kennt kein „auf eine Seite verkleinern“; die Seitenzahl liefert `fop.getResults().getPageCount()` nach dem Lauf, deshalb rendert `PdfExport` notfalls mehrfach mit kleinerer Schrift. Abstände in Tabellenzeilen in `em` angeben, damit sie mit der Schrift schrumpfen.
 - **Quelle:** `PdfExport`, `Layout`, 2026-11-23.
+
+## PowerShell: `$input` ist eine automatische Variable
+
+- **Symptom:** Ein Skript, das `$input = 'target\paket\eingabe'` setzt und danach `Copy-Item … $input` aufruft, verhält sich unberechenbar.
+- **Ursache:** `$input` ist in PowerShell der Enumerator für Pipeline-Eingaben und darf nicht als eigene Variable benutzt werden. Ähnlich: `$args`, `$host`, `$error`, `$matches`.
+- **Lösung:** Andere Namen wählen (in `scripts/package.ps1`: `$eingabe`).
+- **Quelle:** https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_automatic_variables, 2026-11-23.
+
+## PowerShell 5.1 liest `.ps1` ohne BOM als ANSI
+
+- **Symptom:** Umlaute in Meldungen eines Skripts erscheinen als `Ã¼`.
+- **Ursache:** Windows PowerShell 5.1 nimmt für Skriptdateien ohne BOM die ANSI-Codepage an. Das ist die Gegenrichtung zum Eintrag „PowerShell 5.1 schreibt UTF-8 mit BOM“: `.java`-Dateien dürfen keinen BOM haben, `.ps1`-Dateien mit Umlauten brauchen einen.
+- **Lösung:** `.ps1` mit Umlauten als UTF-8 **mit** BOM speichern (`scripts/package.ps1`) oder auf Umlaute verzichten.
+- **Quelle:** 2026-11-23.
+
+## jpackage: `jdeps --print-module-deps` reicht nicht für die gekürzte Laufzeit
+
+- **Problem:** jdeps findet nur statische Verweise. Module, die über Reflection oder ServiceLoader geladen werden, fehlen in seiner Liste und damit in der gekürzten Laufzeit. Kandidaten sind `jdk.localedata` (laut JDK-Doku liegen Gebietsschemata außer Englisch dort, also auch deutsche Zahlen- und Datumsformate), `jdk.charsets`, `jdk.crypto.ec` und `java.naming`. Ein konkreter Fehler ohne diese Module wurde nicht beobachtet, sie sind vorsorglich drin (unverifiziert, ob nötig).
+- **Lösung:** jdeps-Liste plus diese Module in `scripts/package.ps1` eintragen und das entpackte Paket aus einem fremden Ordner testen (`openbilling-cli.exe export` auf eine Kopie von `tests/fixtures/minimal.ods`), damit nicht versehentlich `tools/kosit/config` im Arbeitsverzeichnis gefunden wird. jdeps braucht bei Mustangs Abhängigkeiten `--ignore-missing-deps --multi-release 21`.
+- **Quelle:** 2026-11-23.
