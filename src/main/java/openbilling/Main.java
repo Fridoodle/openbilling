@@ -138,7 +138,7 @@ public final class Main {
             return UNGUELTIG;
         }
         Files.writeString(xmlDatei, xml, StandardCharsets.UTF_8);
-        Files.write(pdfDatei, PdfExport.hybrid(xml));
+        Files.write(pdfDatei, PdfExport.hybrid(RechnungOds.lese(datei), xml));
         out.println("Geschrieben: " + xmlDatei);
         out.println("Geschrieben: " + pdfDatei + " (PDF/A-3 mit eingebetteter xrechnung.xml)");
         return OK;

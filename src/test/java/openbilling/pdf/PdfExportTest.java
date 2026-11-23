@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.IntStream;
 import openbilling.Testdaten;
+import openbilling.model.Rechnung.Steuerkategorie;
 import openbilling.xml.CiiSchreiber;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 import org.mustangproject.validator.ZUGFeRDValidator;
 
@@ -20,7 +23,7 @@ class PdfExportTest {
     @Test
     void hybridIstPdfA3MitEingebetteterXRechnung() throws Exception {
         String xml = CiiSchreiber.schreibe(Testdaten.minimal());
-        byte[] pdf = PdfExport.hybrid(xml);
+        byte[] pdf = PdfExport.hybrid(Testdaten.minimal(), xml);
         Path out = Path.of("out/pdf");
         Files.createDirectories(out);
         Path datei = out.resolve("minimal.pdf");
@@ -43,5 +46,33 @@ class PdfExportTest {
         String bericht = validator.validate(datei.toString());
         Files.writeString(out.resolve("minimal-mustang-bericht.xml"), bericht);
         assertTrue(validator.wasCompletelyValid(), bericht);
+    }
+
+    @Test
+    void sichtZeigtRechnungOhneTechnischeAngaben() throws Exception {
+        try (var doc = Loader.loadPDF(PdfExport.sicht(Testdaten.minimal()))) {
+            assertEquals(1, doc.getNumberOfPages());
+            String text = new PDFTextStripper().getText(doc);
+            assertTrue(text.contains("RE-2026-0001"), text);
+            assertTrue(text.contains("1.011,50 €"), text);
+            assertTrue(text.contains("DE02 1203 0000 0000 2020 51"), text);
+            assertTrue(!text.contains("urn:") && !text.contains("04011000-12345-03"), text);
+        }
+    }
+
+    @Test
+    void vielePositionenPassenDurchKleinereSchriftAufEineSeite() throws Exception {
+        var r = Testdaten.rechnung(IntStream.rangeClosed(1, 32)
+                .mapToObj(i -> Testdaten.pos(String.valueOf(i), "1", "10.00", Steuerkategorie.S, "19")).toList());
+        byte[] pdf = PdfExport.sicht(r);
+        Files.write(Files.createDirectories(Path.of("out/pdf")).resolve("viele.pdf"), pdf);
+        try (var doc = Loader.loadPDF(pdf)) {
+            assertEquals(1, doc.getNumberOfPages());
+        }
+        var zuViele = Testdaten.rechnung(IntStream.rangeClosed(1, 120)
+                .mapToObj(i -> Testdaten.pos(String.valueOf(i), "1", "10.00", Steuerkategorie.S, "19")).toList());
+        try (var doc = Loader.loadPDF(PdfExport.sicht(zuViele))) {
+            assertTrue(doc.getNumberOfPages() > 1);
+        }
     }
 }

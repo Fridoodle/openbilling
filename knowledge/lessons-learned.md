@@ -14,7 +14,8 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Symptom:** `NullPointerException: … because "fopInput" is null` in `ZUGFeRDVisualizer.toPDFfromFOP`, auch mit einer gültigen Fixture.
 - **Ursache:** Fehler in der Variante, die das PDF als `byte[]` zurückgibt (in Mustang 2.26.0, Ursache nicht weiter untersucht).
 - **Lösung:** Die Variante `toPDF(xmlDatei, pdfDatei, sprache)` benutzen, die in eine Datei schreibt, und die Datei danach lesen (`PdfExport`). Bei einem Mustang-Update prüfen, ob der Fehler behoben ist.
-- **Quelle:** `PdfExport`, `PdfExportTest`, 2026-11-23.
+- **Stand:** openbilling ruft den Visualizer seit dem eigenen Layout nicht mehr auf (`decisions.md`, „PDF entsteht in der App“). Der Eintrag bleibt für den Fall, dass er wieder gebraucht wird.
+- **Quelle:** frühere Fassung von `PdfExport`, 2026-11-23.
 
 ## Maven unter PowerShell: `-D`-Argumente mit Punkt quoten
 
@@ -90,3 +91,9 @@ Stolperfallen und ihre Lösung. Format: `## Problem` · Symptom · Ursache · L�
 - **Symptom:** Der Swing-Dialog `JFileChooser` sieht unter Windows fremd aus und kennt weder Schnellzugriff noch Explorer-Suche. Nutzer wünschen den gewohnten Windows-Dialog.
 - **Lösung:** `java.awt.FileDialog` öffnet den Dialog des Betriebssystems und braucht keine Bibliothek. Zwei Eigenheiten unter Windows: `setFilenameFilter` wird ignoriert, als Filter wirkt stattdessen ein Muster in `setFile("*.ods")`. Im Modus `SAVE` fragt der Dialog selbst nach, bevor er eine vorhandene Datei überschreibt, aber nur für den Namen, wie er eingegeben wurde. Hängt das Programm die Endung danach selbst an, muss es selbst nachfragen (`Fenster.waehleZiel`).
 - **Quelle:** 2026-11-23, Windows 11, JDK 21.
+
+## FOP direkt benutzen: Konfiguration und Seitenzahl
+
+- **Aufbau:** `new FopFactoryBuilder(basisUri, new ClasspathResolverURIAdapter()).setConfiguration(new DefaultConfigurationBuilder().build(strom))` mit `fop-config.xconf` aus dem Mustang-JAR, danach denselben Resolver am `FontManager` setzen, sonst findet FOP die Schriften unter `classpath:fonts/…` nicht. PDF/A über `agent.getRendererOptions().put("pdf-a-mode", "PDF/A-3b")`. So macht es auch Mustang selbst.
+- **Stolperfallen:** Die Konfiguration hat `strict-validation`, also keine leere `fo:table-body` und in jeder `fo:table-cell` ein Block. FO kennt kein „auf eine Seite verkleinern“; die Seitenzahl liefert `fop.getResults().getPageCount()` nach dem Lauf, deshalb rendert `PdfExport` notfalls mehrfach mit kleinerer Schrift. Abstände in Tabellenzeilen in `em` angeben, damit sie mit der Schrift schrumpfen.
+- **Quelle:** `PdfExport`, `Layout`, 2026-11-23.

@@ -442,7 +442,7 @@ public final class Fenster extends JFrame {
         imHintergrund("Erzeuge das PDF …", () -> {
             String xml = CiiSchreiber.schreibe(r);
             List<String> m = mitXRechnung ? meldungen(xml) : List.<String>of();
-            return m.isEmpty() ? (Object) (mitXRechnung ? PdfExport.hybrid(xml) : PdfExport.sicht(xml)) : m;
+            return m.isEmpty() ? (Object) (mitXRechnung ? PdfExport.hybrid(r, xml) : PdfExport.sicht(r)) : m;
         }, ergebnis -> {
             if (ergebnis instanceof byte[] pdf) {
                 Path ziel = waehleZiel("pdf", e);
