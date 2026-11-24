@@ -178,7 +178,20 @@ public final class Fenster extends JFrame {
         d.addSeparator();
         d.add(eintrag("Prüfen", KeyEvent.VK_P, true, this::pruefe));
         d.add(eintrag("Als PDF exportieren…", 0, true, () -> exportiere(false)));
-        d.add(eintrag("Als E-Rechnung (ZUGFeRD-PDF) exportieren…", KeyEvent.VK_E, true, () -> exportiere(true)));
+        JMenuItem eRechnung = eintrag(exportText(), KeyEvent.VK_E, true, () -> exportiere(true));
+        d.add(eRechnung);
+        d.addMenuListener(new MenuListener() { // Format kann sich im Formular geändert haben
+            @Override
+            public void menuSelected(MenuEvent e) {
+                eRechnung.setText(exportText());
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {}
+
+            @Override
+            public void menuCanceled(MenuEvent e) {}
+        });
         d.add(eintrag("Als E-Rechnung (XML) exportieren…", 0, true, this::exportiereXml));
         d.addSeparator();
         d.add(eintrag("Beenden", 0, false,
@@ -270,6 +283,11 @@ public final class Fenster extends JFrame {
             nurMitRechnung.add(m);
         }
         return m;
+    }
+
+    /** Menütext des Exports mit dem im Formular gewählten Format. */
+    private String exportText() {
+        return "Als E-Rechnung (" + formular.formatName() + ") exportieren…";
     }
 
     private JComponent startseite() {

@@ -318,6 +318,11 @@ final class Formular extends JPanel implements Scrollable {
         return gewaehlt == null ? FORMATE[0][1] : gewaehlt;
     }
 
+    /** Kurzname des gewählten Formats für Menü und Meldungen. */
+    String formatName() {
+        return Rechnung.istXRechnung(formatCode()) ? "XRechnung" : "ZUGFeRD EN 16931";
+    }
+
     private void waehleFormat(String code) {
         for (String[] f : FORMATE) {
             if (f[1].equals(code)) {
