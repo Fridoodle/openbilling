@@ -337,17 +337,17 @@ Testdaten: `xrechnung-testsuite` (Mirror auf GitHub, Original auf projekte.kosit
 - **Eine XRechnung ist reines XML.** Ein PDF ist dabei nur eine Sichtkopie. Für B2G (ZRE, OZG-RE) ist **das XML rechtlich maßgeblich**, und auch im B2B gilt laut BMF bei Abweichungen das XML.
 - Das Hybridformat ist **ZUGFeRD 2.x = Factur-X 1.x**: ein PDF/A-3 mit eingebettetem **CII-XML**. Aktuell ist **ZUGFeRD 2.5.2 / Factur-X 1.09.2**, wirksam ab 01.09.2026. Davor galt 2.4 bzw. 1.08 (ab 15.01.2026).
   - Profile: MINIMUM, BASIC WL, BASIC, **EN 16931 (COMFORT)**, EXTENDED sowie das Referenzprofil **XRECHNUNG**. MINIMUM und BASIC WL gelten in DE **nicht** als E-Rechnung.
-  - Für openbilling ist das Profil **XRECHNUNG** zu verwenden: Das eingebettete CII-XML trägt die XRechnung-CustomizationID (BT-24 wie in Abschnitt 1) und erfüllt alle BR-DE-Regeln. Behördenportale nehmen es an. Für reines B2B genügt auch **EN 16931** mit der GuidelineID `urn:cen.eu:en16931:2017`.
+  - openbilling erzeugt zwei Profile, je nach BT-24 (siehe `decisions.md`, 2026-11-24): **XRECHNUNG** (Vorgabe) mit der XRechnung-CustomizationID (BT-24 wie in Abschnitt 1), das alle BR-DE-Regeln erfüllt und von Behördenportalen angenommen wird, und **EN 16931** mit der GuidelineID `urn:cen.eu:en16931:2017` für Geschäftskunden. EN 16931 braucht keine Leitweg-ID (BT-10) und keinen Verkäuferkontakt (BG-6). Der KoSIT-Validator prüft es im Szenario „EN16931 (CII)“ ohne BR-DE-Regeln.
 - **Technische Anforderungen:**
 
 | Punkt | Wert |
 |---|---|
 | PDF-Standard | **PDF/A-3** (a, b oder u; in der Praxis meist PDF/A-3b) |
-| Dateiname des Anhangs | `factur-x.xml`; **beim Profil XRECHNUNG `xrechnung.xml`**. So erzeugt es Mustang 2.26.0 mit Profil `XRECHNUNG`, und Mustangs Validator akzeptiert es (geprüft 23.11.2026, `PdfExportTest`). Gegen den Text der FeRD-Spezifikation selbst noch nicht gelesen. |
+| Dateiname des Anhangs | `factur-x.xml`; **beim Profil XRECHNUNG `xrechnung.xml`**. So erzeugt es Mustang 2.26.0 mit Profil `XRECHNUNG` bzw. `EN16931` (`Profiles.getByName`), und Mustangs Validator akzeptiert beides (geprüft 23./24.11.2026, `PdfExportTest`). Gegen den Text der FeRD-Spezifikation selbst noch nicht gelesen. |
 | Einbettung | `/EmbeddedFiles` und **`/AF`-Array im Catalog** mit Filespec `/AFRelationship` (von Mustang so erzeugt, geprüft) |
 | AFRelationship | `/Alternative` (DE-Empfehlung für EN 16931, EXTENDED und XRECHNUNG; Mustang setzt beim Profil XRECHNUNG `Alternative`, geprüft), `/Data` (MINIMUM und BASIC WL sowie französische Vorgabe), `/Source`. Die Zuordnung für die anderen Profile ist (unverifiziert). |
 | MIME-Typ | `text/xml` (Subtype `/text#2Fxml`, von Mustang so erzeugt, geprüft) |
-| XMP-Metadaten | PDF/A-Extension-Schema mit Namespace `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` (Präfix `fx`). Felder: `fx:DocumentType=INVOICE`, `fx:DocumentFileName=xrechnung.xml` bzw. `factur-x.xml`, `fx:Version=1.0`, `fx:ConformanceLevel=XRECHNUNG` bzw. `EN 16931`. Die ConformanceLevel muss zum XML passen. Für XRECHNUNG genau so von Mustang 2.26.0 erzeugt und von veraPDF (PDF/A-3u) akzeptiert. |
+| XMP-Metadaten | PDF/A-Extension-Schema mit Namespace `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` (Präfix `fx`). Felder: `fx:DocumentType=INVOICE`, `fx:DocumentFileName=xrechnung.xml` bzw. `factur-x.xml`, `fx:Version=1.0`, `fx:ConformanceLevel=XRECHNUNG` bzw. `EN 16931`. Die ConformanceLevel muss zum XML passen. Für XRECHNUNG und EN 16931 genau so von Mustang 2.26.0 erzeugt und von veraPDF (PDF/A-3u) akzeptiert (geprüft 24.11.2026). |
 | Anzahl | genau **ein** Rechnungs-XML. Weitere Anhänge sind erlaubt. |
 
 ### Werkzeuge
