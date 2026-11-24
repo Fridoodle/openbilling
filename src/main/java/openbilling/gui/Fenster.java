@@ -177,7 +177,7 @@ public final class Fenster extends JFrame {
         d.addSeparator();
         d.add(eintrag("Prüfen", KeyEvent.VK_P, true, this::pruefe));
         d.add(eintrag("Als PDF exportieren…", 0, true, () -> exportiere(false)));
-        d.add(eintrag("Als PDF mit XRechnung exportieren…", KeyEvent.VK_E, true, () -> exportiere(true)));
+        d.add(eintrag("Als E-Rechnung (ZUGFeRD-PDF) exportieren…", KeyEvent.VK_E, true, () -> exportiere(true)));
         d.addSeparator();
         d.add(eintrag("Beenden", 0, false,
                 () -> dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING))));
@@ -593,8 +593,8 @@ public final class Fenster extends JFrame {
         if (r != null) {
             imHintergrund("Prüfe die Rechnung …", () -> meldungen(CiiSchreiber.schreibe(r)), m -> {
                 if (m.isEmpty()) {
-                    melde("Geprüft: gültige XRechnung.");
-                    JOptionPane.showMessageDialog(this, "Die Rechnung ist eine gültige XRechnung.", "Prüfen",
+                    melde("Geprüft: gültige " + r.format() + ".");
+                    JOptionPane.showMessageDialog(this, "Die Rechnung ist eine gültige " + r.format() + ".", "Prüfen",
                             JOptionPane.INFORMATION_MESSAGE);
                 } else {
                     zeigeProbleme("Die Rechnung ist noch nicht gültig:", m);
@@ -620,7 +620,8 @@ public final class Fenster extends JFrame {
                     if (mitXRechnung) { // nur die echte Rechnung zählt für den Nummernvorschlag
                         versuche(() -> einstellungen.merkeNummer(r.nummer()));
                     }
-                    melde("Exportiert: " + ziel + (mitXRechnung ? " (PDF/A-3 mit XRechnung)" : " (ohne XRechnung)"));
+                    melde("Exportiert: " + ziel + (mitXRechnung
+                            ? " (ZUGFeRD-PDF mit " + PdfExport.anhang(r) + ")" : " (ohne E-Rechnung)"));
                     Object[] wahl = {"PDF öffnen", "Schließen"};
                     if (JOptionPane.showOptionDialog(this, "Gespeichert: " + ziel, "Export",
                             JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, wahl, wahl[1]) == 0) {
