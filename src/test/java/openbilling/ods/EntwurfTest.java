@@ -30,6 +30,22 @@ class EntwurfTest {
         assertEquals(e.daten(), RechnungOds.leseEntwurf(kopie).daten());
     }
 
+    /** BT-10 ist nur in der XRechnung Pflicht (BR-DE-15), nicht bei ZUGFeRD EN 16931. */
+    @Test
+    void leitwegIdNurBeiXRechnungPflicht() throws Exception {
+        Entwurf fixture = RechnungOds.leseEntwurf(FIXTURE);
+        var ohne = new java.util.HashMap<>(fixture.daten());
+        ohne.remove("BT-10");
+        OdsFehler f = assertThrows(OdsFehler.class,
+                () -> RechnungOds.rechnung(new Entwurf(ohne, fixture.positionen())));
+        assertTrue(f.probleme().stream().anyMatch(p -> p.contains("BT-10")), f.getMessage());
+
+        ohne.put("BT-24", RechnungOds.EN16931);
+        var r = RechnungOds.rechnung(new Entwurf(ohne, fixture.positionen()));
+        assertEquals(null, r.kaeuferReferenz());
+        assertTrue(!r.xrechnung());
+    }
+
     @Test
     void unvollstaendigerEntwurfLaesstSichSpeichernAberNichtPruefen(@TempDir Path tmp) throws Exception {
         Entwurf e = new Entwurf(Map.of("BT-27", "Muster GmbH", "BT-38", "01067", "BT-2", "23.11.2026"),

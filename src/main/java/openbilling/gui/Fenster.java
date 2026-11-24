@@ -20,6 +20,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -177,7 +178,21 @@ public final class Fenster extends JFrame {
         d.addSeparator();
         d.add(eintrag("Prüfen", KeyEvent.VK_P, true, this::pruefe));
         d.add(eintrag("Als PDF exportieren…", 0, true, () -> exportiere(false)));
-        d.add(eintrag("Als PDF mit XRechnung exportieren…", KeyEvent.VK_E, true, () -> exportiere(true)));
+        JMenuItem eRechnung = eintrag(exportText(), KeyEvent.VK_E, true, () -> exportiere(true));
+        d.add(eRechnung);
+        d.addMenuListener(new MenuListener() { // Format kann sich im Formular geändert haben
+            @Override
+            public void menuSelected(MenuEvent e) {
+                eRechnung.setText(exportText());
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {}
+
+            @Override
+            public void menuCanceled(MenuEvent e) {}
+        });
+        d.add(eintrag("Als E-Rechnung (XML) exportieren…", 0, true, this::exportiereXml));
         d.addSeparator();
         d.add(eintrag("Beenden", 0, false,
                 () -> dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING))));
@@ -268,6 +283,11 @@ public final class Fenster extends JFrame {
             nurMitRechnung.add(m);
         }
         return m;
+    }
+
+    /** Menütext des Exports mit dem im Formular gewählten Format. */
+    private String exportText() {
+        return "Als E-Rechnung (" + formular.formatName() + ") exportieren…";
     }
 
     private JComponent startseite() {
@@ -543,7 +563,11 @@ public final class Fenster extends JFrame {
                 : Path.of(einstellungen.wert(ORDNER, System.getProperty("user.home")));
         SystemFileChooser d = new SystemFileChooser(ordner.toFile());
         d.setFileFilter(new SystemFileChooser.FileNameExtensionFilter(
-                endung.equals("pdf") ? "PDF-Dokument" : "OpenDocument-Tabelle", endung));
+                switch (endung) {
+                    case "pdf" -> "PDF-Dokument";
+                    case "xml" -> "E-Rechnung (XML)";
+                    default -> "OpenDocument-Tabelle";
+                }, endung));
         d.putPlatformProperty(SystemFileChooser.WINDOWS_DEFAULT_EXTENSION, endung);
         if (vorschlag != null) {
             d.setSelectedFile(ordner.resolve(vorschlag + "." + endung).toFile());
@@ -564,7 +588,7 @@ public final class Fenster extends JFrame {
         if (!p.getFileName().toString().toLowerCase().endsWith("." + endung)) {
             p = p.resolveSibling(p.getFileName() + "." + endung);
             if (Files.exists(p) && !bestaetigt(p.getFileName() + " gibt es schon. Ersetzen?"
-                    + (endung.equals("pdf") ? "\nEine bereits versendete Rechnung darf nicht verändert werden." : ""))) {
+                    + (!endung.equals("ods") ? "\nEine bereits versendete Rechnung darf nicht verändert werden." : ""))) {
                 return null;
             }
         }
@@ -593,8 +617,8 @@ public final class Fenster extends JFrame {
         if (r != null) {
             imHintergrund("Prüfe die Rechnung …", () -> meldungen(CiiSchreiber.schreibe(r)), m -> {
                 if (m.isEmpty()) {
-                    melde("Geprüft: gültige XRechnung.");
-                    JOptionPane.showMessageDialog(this, "Die Rechnung ist eine gültige XRechnung.", "Prüfen",
+                    melde("Geprüft: gültige " + r.format() + ".");
+                    JOptionPane.showMessageDialog(this, "Die Rechnung ist eine gültige " + r.format() + ".", "Prüfen",
                             JOptionPane.INFORMATION_MESSAGE);
                 } else {
                     zeigeProbleme("Die Rechnung ist noch nicht gültig:", m);
@@ -620,12 +644,41 @@ public final class Fenster extends JFrame {
                     if (mitXRechnung) { // nur die echte Rechnung zählt für den Nummernvorschlag
                         versuche(() -> einstellungen.merkeNummer(r.nummer()));
                     }
-                    melde("Exportiert: " + ziel + (mitXRechnung ? " (PDF/A-3 mit XRechnung)" : " (ohne XRechnung)"));
+                    melde("Exportiert: " + ziel + (mitXRechnung
+                            ? " (ZUGFeRD-PDF mit " + PdfExport.anhang(r) + ")" : " (ohne E-Rechnung)"));
                     Object[] wahl = {"PDF öffnen", "Schließen"};
                     if (JOptionPane.showOptionDialog(this, "Gespeichert: " + ziel, "Export",
                             JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, wahl, wahl[1]) == 0) {
                         versuche(() -> Desktop.getDesktop().open(ziel.toFile()));
                     }
+                }
+            } else {
+                @SuppressWarnings("unchecked")
+                List<String> m = (List<String>) ergebnis;
+                zeigeProbleme("Die Rechnung ist noch nicht gültig und wurde nicht exportiert:", m);
+            }
+        });
+    }
+
+    /** Nur die geprüfte XML (XRechnung bzw. ZUGFeRD-CII nach BT-24), z. B. für Portale wie ZRE/OZG-RE. */
+    private void exportiereXml() {
+        Rechnung r = vollstaendig();
+        if (r == null) {
+            return;
+        }
+        Entwurf e = formular.entwurf();
+        imHintergrund("Erzeuge die XML …", () -> {
+            String xml = CiiSchreiber.schreibe(r);
+            List<String> m = meldungen(xml);
+            return m.isEmpty() ? (Object) xml : m;
+        }, ergebnis -> {
+            if (ergebnis instanceof String xml) {
+                Path ziel = waehleZiel("xml", e);
+                if (ziel != null && versuche(() -> Files.writeString(ziel, xml, StandardCharsets.UTF_8))) {
+                    versuche(() -> einstellungen.merkeNummer(r.nummer()));
+                    melde("Exportiert: " + ziel + " (" + r.format() + ")");
+                    JOptionPane.showMessageDialog(this, "Gespeichert: " + ziel, "Export",
+                            JOptionPane.INFORMATION_MESSAGE);
                 }
             } else {
                 @SuppressWarnings("unchecked")

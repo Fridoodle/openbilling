@@ -1,14 +1,14 @@
 # openbilling
 
-E-Rechnungen nach **XRechnung** erstellen, ohne Abo und ohne Cloud. openbilling speichert jede Rechnung als OpenDocument-Tabelle (`.ods`) und exportiert sie als PDF mit eingebetteter XRechnung, so wie ZUGFeRD/Factur-X. Jede XML wird vor dem Export mit dem offiziellen KoSIT-Validator geprüft.
+E-Rechnungen nach **XRechnung** und **ZUGFeRD** erstellen, ohne Abo und ohne Cloud. openbilling speichert jede Rechnung als OpenDocument-Tabelle (`.ods`) und exportiert sie als ZUGFeRD-PDF (Factur-X) mit eingebetteter XML. Jede XML wird vor dem Export mit dem offiziellen KoSIT-Validator geprüft.
 
 - **Rechnungen als `.ods`:** Die Tabelle ist die Quelle der Wahrheit und lässt sich auch in LibreOffice oder OpenOffice bearbeiten.
-- **Export als Hybrid-PDF:** Eine lesbare Rechnung auf einer Seite (PDF/A-3) mit der XRechnung-XML (UN/CEFACT CII, XRechnung 3.0) als Anhang.
+- **Export als ZUGFeRD-PDF:** Eine lesbare Rechnung auf einer Seite (PDF/A-3) mit der XML (UN/CEFACT CII) als Anhang. Für Behörden im Profil XRECHNUNG (XRechnung 3.0, `xrechnung.xml`), für Geschäftskunden im Profil EN 16931 (`factur-x.xml`, ohne Leitweg-ID). Die Auswahl „Format“ im Fenster bzw. BT-24 in der `.ods` bestimmt das Profil.
 - **Geprüft vor dem Versand:** Exportiert wird nur, was der KoSIT-Validator akzeptiert. Fehler zeigt das Programm mit Regel-ID (z. B. `BR-DE-15`).
 - **Vorlagen und Adressbuch:** Eigene Daten einmal in eine Vorlage eintragen, Kunden im Adressbuch speichern.
 - **Fenster und Kommandozeile:** Hell- und Dunkelmodus, einstellbare Schriftgröße, dazu eine CLI für Skripte.
 
-> **Stand:** Version 1.1. Unterstützt sind Rechnungen mit Überweisung, SEPA-Lastschrift, Karten-, Bar- und Onlinezahlung (z. B. PayPal), Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
+> **Stand:** Version 1.2. XRechnung für Behörden und ZUGFeRD (Profil EN 16931) für Geschäftskunden. Unterstützt sind Rechnungen mit Überweisung, SEPA-Lastschrift, Karten-, Bar- und Onlinezahlung (z. B. PayPal), Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
 
 ## Installation (Windows)
 
@@ -30,7 +30,7 @@ Die Programmdateien sind noch nicht digital signiert. Windows SmartScreen zeigt 
 Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen Datei mit der zugehörigen `.sha256` im Release:
 
 ```powershell
-Get-FileHash openbilling-1.1.0-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash openbilling-1.2.0-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm. Bitte melde es als [Issue](https://github.com/Fridoodle/openbilling/issues) mit dem Namen des Scanners.
@@ -45,7 +45,8 @@ Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm.
 2. Neue Rechnung aus der Vorlage erstellen, Kunde und Positionen eintragen. Pflichtfelder sind mit `*` markiert. Die Rechnungsnummer schlägt openbilling vor: die zuletzt exportierte plus eins, im neuen Jahr wieder ab 1.
    Rabatt auf eine Position gibst du in der Spalte **Rabatt %** ein. Rabatt und Zuschlag auf die ganze Rechnung (in Prozent oder als Betrag, z. B. Versand) sowie Skonto stehen unter **Rabatt, Zuschlag und Skonto**. Bei mehreren Steuersätzen verteilt openbilling Rabatt und Zuschlag anteilig.
    Unter **Zahlung → Zahlungsart** wählst du Überweisung, SEPA-Lastschrift, Kredit- oder Debitkarte, bar oder online. Für die Lastschrift trägst du deine Gläubiger-ID (am besten in der Vorlage) sowie Mandatsreferenz und IBAN des Kunden ein; die beiden letzten speichert das Adressbuch mit dem Kunden. Das PDF kündigt den Einzug mit Betrag und Fälligkeitsdatum an. Bei Kartenzahlung nur die letzten Ziffern der Karte eingeben, nie die ganze Nummer.
-3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als PDF mit XRechnung exportieren** (Strg+E) prüft und schreibt das Hybrid-PDF.
+   Unter **Rechnung → Format** wählst du **XRechnung (Behörden)**, dann ist die Leitweg-ID Pflicht, oder **ZUGFeRD EN 16931 (Unternehmen)** für Geschäftskunden ohne Leitweg-ID.
+3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als E-Rechnung (XRechnung) exportieren** bzw. **(ZUGFeRD EN 16931)** (Strg+E) prüft und schreibt das ZUGFeRD-PDF.
 
 **Schrift zu klein?** Unter **Ansicht → Schriftgröße** lässt sich die ganze Oberfläche auf 110 bis 200 % vergrößern, auch mit Strg + und Strg − (Strg 0 setzt zurück). openbilling merkt sich die Größe.
 
@@ -59,7 +60,7 @@ Auch mitten in einer Rechnung geht **Datei → Neu aus Vorlage** (neue Rechnung 
 
 ```powershell
 .\openbilling-cli.exe neu rechnung.ods       # neue Rechnung aus der eigenen Vorlage
-.\openbilling-cli.exe pruefen rechnung.ods   # XRechnung erzeugen und prüfen
+.\openbilling-cli.exe pruefen rechnung.ods   # E-Rechnung erzeugen und prüfen
 .\openbilling-cli.exe export rechnung.ods    # rechnung.xml und rechnung.pdf daneben schreiben
 .\openbilling-cli.exe --hilfe
 ```

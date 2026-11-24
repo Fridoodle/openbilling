@@ -154,7 +154,9 @@ public final class CiiSchreiber {
 
     private void vereinbarung() throws XMLStreamException {
         start("ApplicableHeaderTradeAgreement");
-        text("BuyerReference", r.kaeuferReferenz()); // BT-10
+        if (r.kaeuferReferenz() != null) {
+            text("BuyerReference", r.kaeuferReferenz()); // BT-10
+        }
         partei("SellerTradeParty", r.verkaeufer()); // BG-4
         partei("BuyerTradeParty", r.kaeufer()); // BG-7
         end();

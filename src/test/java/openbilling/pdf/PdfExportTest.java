@@ -49,6 +49,33 @@ class PdfExportTest {
     }
 
     @Test
+    void zugferdEn16931BettetFacturXXmlEin() throws Exception {
+        var r = Testdaten.b2b();
+        String xml = CiiSchreiber.schreibe(r);
+        byte[] pdf = PdfExport.hybrid(r, xml);
+        Path datei = Files.createDirectories(Path.of("out/pdf")).resolve("b2b-en16931.pdf");
+        Files.write(datei, pdf);
+        assertEquals("factur-x.xml", PdfExport.anhang(r));
+
+        try (var doc = Loader.loadPDF(pdf)) {
+            var catalog = doc.getDocumentCatalog();
+            var anhaenge = catalog.getNames().getEmbeddedFiles().getNames();
+            assertEquals(1, anhaenge.size());
+            var fs = anhaenge.get("factur-x.xml");
+            assertArrayEquals(xml.getBytes(StandardCharsets.UTF_8), fs.getEmbeddedFile().toByteArray());
+            assertEquals("Alternative", fs.getCOSObject().getNameAsString(COSName.getPDFName("AFRelationship")));
+            String xmp = new String(catalog.getMetadata().toByteArray(), StandardCharsets.UTF_8);
+            assertTrue(xmp.contains("<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>"), xmp);
+            assertTrue(xmp.contains("<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>"), xmp);
+        }
+
+        var validator = new ZUGFeRDValidator();
+        String bericht = validator.validate(datei.toString());
+        Files.writeString(Path.of("out/pdf/b2b-en16931-mustang-bericht.xml"), bericht);
+        assertTrue(validator.wasCompletelyValid(), bericht);
+    }
+
+    @Test
     void sichtZeigtRechnungOhneTechnischeAngaben() throws Exception {
         try (var doc = Loader.loadPDF(PdfExport.sicht(Testdaten.minimal()))) {
             assertEquals(1, doc.getNumberOfPages());

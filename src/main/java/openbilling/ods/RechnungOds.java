@@ -58,6 +58,9 @@ public final class RechnungOds {
     public static final String XRECHNUNG_30 =
             "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0";
 
+    /** BT-24 einer reinen EN-16931-Rechnung: im PDF ZUGFeRD-Profil EN 16931 (Comfort), ohne BR-DE-Regeln. */
+    public static final String EN16931 = "urn:cen.eu:en16931:2017";
+
     /**
      * Vorgaben einer neuen Rechnung. BT-23 ist in XRechnung Pflicht (PEPPOL-EN16931-R001); der Wert ist
      * der übliche Standardprozess.
@@ -487,12 +490,13 @@ public final class RechnungOds {
         String typ = f.pflicht("BT-3");
         String waehrung = f.pflicht("BT-5");
         LocalDate faellig = f.datum("BT-9", false);
-        String referenz = f.pflicht("BT-10");
+        String spezifikation = f.pflicht("BT-24");
+        // Leitweg-ID bzw. Käuferreferenz: nur XRechnung verlangt sie (BR-DE-15)
+        String referenz = Rechnung.istXRechnung(spezifikation) ? f.pflicht("BT-10") : f.text("BT-10");
         String bedingungen = f.text("BT-20");
         LocalDate lieferdatum = f.datum("BT-72", false);
         String befreiung = f.text("BT-120");
         BigDecimal voraus = f.zahl("BT-113", false);
-        String spezifikation = f.pflicht("BT-24");
         String prozess = f.text("BT-23");
         String bemerkung = f.text("BT-22");
         LocalDate von = f.datum("BT-73", false);

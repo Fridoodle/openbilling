@@ -16,7 +16,7 @@ import java.util.List;
  * @param typ             BT-3 (380 Rechnung, 381 Gutschrift, …)
  * @param waehrung        BT-5 (ISO 4217)
  * @param faelligAm       BT-9, optional
- * @param kaeuferReferenz BT-10 Leitweg-ID bzw. Buyer reference, in XRechnung Pflicht
+ * @param kaeuferReferenz BT-10 Leitweg-ID bzw. Buyer reference, in XRechnung Pflicht (BR-DE-15), sonst optional
  * @param zahlungsbedingungen BT-20, optional
  * @param lieferdatum     BT-72, optional
  * @param verkaeufer      BG-4
@@ -114,6 +114,23 @@ public record Rechnung(
         this(spezifikation, prozess, nummer, datum, typ, waehrung, faelligAm, kaeuferReferenz,
                 zahlungsbedingungen, lieferdatum, verkaeufer, kaeufer, zahlung, befreiungsgrund, vorausbezahlt,
                 positionen, null, null, null, null);
+    }
+
+    /**
+     * XRechnung (BT-24 mit der KoSIT-CIUS, BR-DE-Regeln, ZUGFeRD-Profil XRECHNUNG) oder reine EN 16931
+     * (ZUGFeRD-Profil EN 16931/Comfort, z. B. für Geschäftskunden ohne Leitweg-ID).
+     */
+    public static boolean istXRechnung(String spezifikation) {
+        return spezifikation != null && spezifikation.contains("urn:xeinkauf.de:kosit:xrechnung");
+    }
+
+    public boolean xrechnung() {
+        return istXRechnung(spezifikation);
+    }
+
+    /** Name des Formats für Meldungen. */
+    public String format() {
+        return xrechnung() ? "XRechnung" : "ZUGFeRD-Rechnung nach EN 16931";
     }
 
     public Rechnung {

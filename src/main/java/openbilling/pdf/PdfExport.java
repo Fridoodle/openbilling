@@ -11,6 +11,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.stream.StreamSource;
 import openbilling.model.Rechnung;
+import openbilling.ods.RechnungOds;
 import org.apache.fop.apps.FOUserAgent;
 import org.apache.fop.apps.Fop;
 import org.apache.fop.apps.FopFactory;
@@ -22,8 +23,9 @@ import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
 
 /**
- * Hybrid-PDF: Sichtkopie im eigenen Layout ({@link Layout}, XSL-FO über FOP) als PDF/A-3 mit eingebetteter
- * {@code xrechnung.xml} (Factur-X-Profil XRECHNUNG, AFRelationship Alternative).
+ * Hybrid-PDF nach ZUGFeRD 2.x / Factur-X: Sichtkopie im eigenen Layout ({@link Layout}, XSL-FO über FOP) als
+ * PDF/A-3 mit eingebetteter CII-XML, AFRelationship Alternative. Profil XRECHNUNG ({@code xrechnung.xml}) oder
+ * EN 16931 ({@code factur-x.xml}), je nach BT-24.
  * Geprüft mit veraPDF: PDF/A-3u (knowledge/xrechnung-format.md, Abschnitt 8).
  * Die XML muss vorher den KoSIT-Validator bestanden haben.
  */
@@ -43,11 +45,30 @@ public final class PdfExport {
             exporter.load(sicht(r))
                     .setProducer("openbilling")
                     .setCreator("openbilling")
-                    .setProfile(Profiles.getByName("XRECHNUNG"))
+                    .setProfile(Profiles.getByName(profil(r)))
                     .setXML(ciiXml.getBytes(StandardCharsets.UTF_8));
             exporter.export(out);
         }
         return out.toByteArray();
+    }
+
+    /**
+     * ZUGFeRD-Profil zu BT-24. Mustang wählt danach Anhangsname ({@code xrechnung.xml} bzw. {@code factur-x.xml})
+     * und die XMP-ConformanceLevel ({@code XRECHNUNG} bzw. {@code EN 16931}).
+     */
+    static String profil(Rechnung r) {
+        if (r.xrechnung()) {
+            return "XRECHNUNG";
+        }
+        if (RechnungOds.EN16931.equals(r.spezifikation())) {
+            return "EN16931";
+        }
+        throw new IllegalArgumentException("Kein ZUGFeRD-Profil für BT-24 " + r.spezifikation());
+    }
+
+    /** Name der eingebetteten XML. */
+    public static String anhang(Rechnung r) {
+        return r.xrechnung() ? "xrechnung.xml" : "factur-x.xml";
     }
 
     /**

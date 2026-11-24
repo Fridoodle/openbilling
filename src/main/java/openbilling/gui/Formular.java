@@ -89,6 +89,12 @@ final class Formular extends JPanel implements Scrollable {
             "BT-40", "BT-41", "BT-42", "BT-43", "BT-44", "BT-52", "BT-53", "BT-55", "BT-58", "BT-84", "BT-87",
             "BT-89", "BT-90", "BT-91");
 
+    /** Anzeige ↔ Format (BT-24); bestimmt das ZUGFeRD-Profil im PDF. */
+    private static final String[][] FORMATE = {
+        {"XRechnung (Behörden)", openbilling.ods.RechnungOds.XRECHNUNG_30},
+        {"ZUGFeRD EN 16931 (Unternehmen)", openbilling.ods.RechnungOds.EN16931},
+    };
+
     /** Anzeige ↔ Zahlungsart (BT-81, UNTDID 4461). */
     private static final String[][] ZAHLUNGSARTEN = {
         {"SEPA-Überweisung", "58"}, {"SEPA-Lastschrift", "59"}, {"Kreditkarte", "54"}, {"Debitkarte", "55"},
@@ -125,6 +131,8 @@ final class Formular extends JPanel implements Scrollable {
     private final JTextArea beschreibung = new JTextArea(4, 4);
     private boolean waehlt;
     private final JComboBox<String> art = new JComboBox<>();
+    private final JComboBox<String> format = new JComboBox<>();
+    private final Map<String, JLabel> beschriftungen = new HashMap<>();
     /** Felder je Zahlungsart; nur die passende Gruppe ist sichtbar. */
     private Map<String, JPanel> artGruppen;
     private Map<String, String> rest = new HashMap<>();
@@ -144,14 +152,14 @@ final class Formular extends JPanel implements Scrollable {
                 feld("BT-9", "Fällig am", "Rechnung"), 2, feld("BT-10", "Käuferreferenz / Leitweg-ID", "Rechnung"), 2));
         kopf.add(zeile(feld("BT-72", "Leistungsdatum", "Rechnung"), 3,
                 feld("BT-73", "oder Leistungszeitraum von", "Rechnung"), 2, feld("BT-74", "bis", "Rechnung"), 2,
-                new JPanel(), 2));
+                formatAuswahl(), 2));
         kopf.add(zeile(feld("BT-20", "Zahlungsbedingungen", "Rechnung"), 1));
         kopf.add(zeile(feld("BT-22", "Bemerkung, z. B. Einleitung oder Bauvorhaben", "Rechnung"), 1));
         kopf.add(zeile(feld("OB-1", "Schlussformel, z. B. Dank und Grüße", "Rechnung"), 1));
         tipp("OB-1", "Steht unten im PDF, nicht in der XRechnung. In einer Vorlage gespeichert, gilt sie für jede"
                 + " neue Rechnung.");
         tipp("BT-72", "Tag der Lieferung oder Leistung. Bei einem Zeitraum stattdessen von und bis ausfüllen.");
-        tipp("BT-10", "Pflichtangabe. Bei Behörden die Leitweg-ID, sonst z. B. Bestell- oder Kundennummer.");
+        zeigeFormat();
 
         JPanel absender = abschnitt("Absender", null);
         absender.add(zeile(feld("OB-2", "Firmenname im PDF-Kopf", "Absender"), 1));
@@ -279,6 +287,66 @@ final class Formular extends JPanel implements Scrollable {
         return p;
     }
 
+    /** Auswahl des Formats (BT-24): XRechnung für Behörden oder ZUGFeRD EN 16931 für Unternehmen. */
+    private JComponent formatAuswahl() {
+        for (String[] f : FORMATE) {
+            format.addItem(f[0]);
+        }
+        format.addActionListener(e -> {
+            zeigeFormat();
+            geaendert();
+        });
+        format.setToolTipText("<html>Beides ist ein ZUGFeRD-PDF mit eingebetteter XML.<br>XRechnung verlangt die"
+                + " Leitweg-ID und den Kontakt des Absenders,<br>EN 16931 genügt für Geschäftskunden.</html>");
+        JLabel l = gedaempft(new JLabel("Format"));
+        l.putClientProperty("FlatLaf.styleClass", "small");
+        l.setLabelFor(format);
+        JPanel p = new JPanel(new BorderLayout(0, 3));
+        p.add(l, BorderLayout.NORTH);
+        p.add(format);
+        return p;
+    }
+
+    /** BT-24 der Auswahl. Ein unbekannter Wert aus einer ODS steht unverändert als eigener Eintrag darin. */
+    private String formatCode() {
+        String gewaehlt = (String) format.getSelectedItem();
+        for (String[] f : FORMATE) {
+            if (f[0].equals(gewaehlt)) {
+                return f[1];
+            }
+        }
+        return gewaehlt == null ? FORMATE[0][1] : gewaehlt;
+    }
+
+    /** Kurzname des gewählten Formats für Menü und Meldungen. */
+    String formatName() {
+        return Rechnung.istXRechnung(formatCode()) ? "XRechnung" : "ZUGFeRD EN 16931";
+    }
+
+    private void waehleFormat(String code) {
+        for (String[] f : FORMATE) {
+            if (f[1].equals(code)) {
+                format.setSelectedItem(f[0]);
+                return;
+            }
+        }
+        if (((javax.swing.DefaultComboBoxModel<String>) format.getModel()).getIndexOf(code) < 0) {
+            format.addItem(code);
+        }
+        format.setSelectedItem(code);
+    }
+
+    /** Die Käuferreferenz ist nur in der XRechnung Pflicht (BR-DE-15). */
+    private void zeigeFormat() {
+        boolean xr = Rechnung.istXRechnung(formatCode());
+        JLabel l = beschriftungen.get("BT-10");
+        if (l != null) {
+            l.setText(xr ? "Käuferreferenz / Leitweg-ID *" : "Käuferreferenz");
+        }
+        tipp("BT-10", xr ? "Pflichtangabe. Bei Behörden die Leitweg-ID, sonst z. B. Bestell- oder Kundennummer."
+                : "Optional, z. B. Bestell- oder Kundennummer des Empfängers.");
+    }
+
     /** Zeilen, die nur bei bestimmten Zahlungsarten sichtbar sind. */
     private static JPanel gruppe(JComponent... zeilen) {
         JPanel p = new JPanel();
@@ -388,6 +456,7 @@ final class Formular extends JPanel implements Scrollable {
         felder.put(bt, f);
         namen.put(bt, gruppe + " – " + beschriftung);
         JLabel l = new JLabel(PFLICHT.contains(bt) ? beschriftung + " *" : beschriftung);
+        beschriftungen.put(bt, l);
         l.putClientProperty("FlatLaf.styleClass", "small");
         gedaempft(l);
         l.setLabelFor(f);
@@ -668,6 +737,7 @@ final class Formular extends JPanel implements Scrollable {
             }
         }
         waehleArt(e.daten().getOrDefault("BT-81", openbilling.ods.RechnungOds.VORGABEN.get("BT-81")));
+        waehleFormat(e.daten().getOrDefault("BT-24", openbilling.ods.RechnungOds.VORGABEN.get("BT-24")));
         positionen.setRowCount(0);
         for (String[] z : e.positionen()) {
             BigDecimal preis = zahl(z[4]);
@@ -687,6 +757,7 @@ final class Formular extends JPanel implements Scrollable {
             d.putIfAbsent(bt, openbilling.ods.RechnungOds.VORGABEN.get(bt));
         }
         d.put("BT-81", artCode());
+        d.put("BT-24", formatCode());
         felder.forEach((bt, f) -> {
             if (f.getText().isBlank()) {
                 d.remove(bt);
