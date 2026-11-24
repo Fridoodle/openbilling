@@ -48,6 +48,15 @@ class CiiSchreiberTest {
         assertExportbereit(pruefe(Testdaten.minimal(), "minimal"));
     }
 
+    /** EN 16931 ohne XRechnung-Pflichtfelder: KoSIT prüft im Szenario „EN16931 (CII)“ ohne BR-DE-Regeln. */
+    @Test
+    void zugferdEn16931OhneLeitwegId() throws Exception {
+        var r = Testdaten.b2b();
+        assertFalse(r.xrechnung());
+        assertFalse(CiiSchreiber.schreibe(r).contains("BuyerReference"));
+        assertExportbereit(pruefe(r, "b2b-en16931"));
+    }
+
     @Test
     void leistungszeitraumBemerkungUndPositionsbeschreibung() throws Exception {
         var basis = Testdaten.rechnung(List.of(new Position("1", "Planung", b("1"), "LS", b("3000.00"), null,

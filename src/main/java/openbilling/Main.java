@@ -25,16 +25,23 @@ public final class Main {
     static final int FEHLER = 2;
 
     private static final String HILFE = """
-            openbilling – E-Rechnungen nach XRechnung aus OpenDocument-Tabellen
+            openbilling – E-Rechnungen (XRechnung, ZUGFeRD) aus OpenDocument-Tabellen
 
               (ohne Argumente)                    Fenster öffnen
               <rechnung.ods>                      Rechnung im Fenster öffnen
               --hilfe                             diese Hilfe
               neu <rechnung.ods>                  neue Rechnung aus der eigenen Vorlage anlegen
-              pruefen <rechnung.ods>              XRechnung erzeugen und mit dem KoSIT-Validator prüfen
+              pruefen <rechnung.ods>              E-Rechnung (CII) erzeugen und mit dem KoSIT-Validator prüfen
               export <rechnung.ods> [--ueberschreiben]
-                                                  prüfen, dann <name>.xml und <name>.pdf (PDF/A-3 mit
-                                                  eingebetteter XRechnung) neben die ODS schreiben
+                                                  prüfen, dann <name>.xml und <name>.pdf (ZUGFeRD:
+                                                  PDF/A-3 mit eingebetteter XML) neben die ODS schreiben
+
+            Format nach BT-24 im Blatt Daten:
+              %s
+                  XRechnung, für Behörden (Leitweg-ID in BT-10 Pflicht), ZUGFeRD-Profil XRECHNUNG
+              %s
+                  EN 16931 ohne deutsche Zusatzregeln, für Unternehmen, ZUGFeRD-Profil EN 16931
+              Vorgabe für neue Vorlagen: xrechnung.spezifikation in den Einstellungen
 
             Eigene Vorlage mit Stammdaten: %s
             Einstellungen: %s
@@ -66,7 +73,7 @@ public final class Main {
         List<String> a = new ArrayList<>(List.of(args));
         boolean ueberschreiben = a.remove("--ueberschreiben");
         if (a.size() != 2) {
-            out.printf(HILFE, einstellungen.vorlage(), einstellungen.ordner().resolve(Einstellungen.DATEI));
+            out.printf(HILFE, RechnungOds.XRECHNUNG_30, RechnungOds.EN16931, einstellungen.vorlage(),einstellungen.ordner().resolve(Einstellungen.DATEI));
             return a.isEmpty() || a.contains("--hilfe") ? OK : FEHLER;
         }
         Path datei = Path.of(a.get(1));
@@ -120,7 +127,7 @@ public final class Main {
             out.printf("  %-7s %s: %s%n", m.stufe(), m.regel(), m.text());
         }
         if (ergebnis.exportbereit()) {
-            out.println("Gültige XRechnung (KoSIT-Validator: ACCEPTABLE, keine Warnungen).");
+            out.println("Gültige " + r.format() + " (KoSIT-Validator: ACCEPTABLE, keine Warnungen).");
             return xml;
         }
         out.println(ergebnis.akzeptiert()
@@ -147,7 +154,8 @@ public final class Main {
         Files.write(pdfDatei, PdfExport.hybrid(r, xml));
         einstellungen.merkeNummer(r.nummer());
         out.println("Geschrieben: " + xmlDatei);
-        out.println("Geschrieben: " + pdfDatei + " (PDF/A-3 mit eingebetteter xrechnung.xml)");
+        out.println("Geschrieben: " + pdfDatei + " (ZUGFeRD: PDF/A-3 mit eingebetteter "
+                + PdfExport.anhang(r) + ")");
         return OK;
     }
 }

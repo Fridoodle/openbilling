@@ -43,6 +43,22 @@ public final class Testdaten {
                 null, null, positionen);
     }
 
+    /**
+     * Geschäftskunde: reine EN 16931 (ZUGFeRD-Profil EN 16931) ohne Leitweg-ID, Verkäuferkontakt und
+     * Zahlungsbedingungen, die nur XRechnung verlangt (BR-DE-15, BR-DE-2).
+     */
+    public static Rechnung b2b() {
+        var verkaeufer = new Partei(VERKAEUFER.name(), null, VERKAEUFER.adresse(), null,
+                VERKAEUFER.elektronischeAdresse(), VERKAEUFER.ustId(), null);
+        var kaeufer = new Partei("Kunde AG", null, new Adresse("Hafenstraße 9", "20457", "Hamburg", "DE"), null,
+                new ElektronischeAdresse("EM", "buchhaltung@kunde-ag.example"), "DE987654321", null);
+        return new Rechnung("urn:cen.eu:en16931:2017", null, "RE-2026-0002", LocalDate.of(2026, 11, 24), "380",
+                "EUR", LocalDate.of(2026, 12, 8), null, null, LocalDate.of(2026, 11, 20), verkaeufer, kaeufer,
+                new Zahlung("58", "RE-2026-0002", "DE02120300000000202051", "Beispiel GmbH", null),
+                null, null, List.of(new Position("1", "Beratungsleistung", b("10"), "HUR", b("85.00"), null,
+                        Steuerkategorie.S, b("19"))));
+    }
+
     /** Genau die Rechnung aus tests/fixtures/minimal-cii.xml. */
     public static Rechnung minimal() {
         return rechnung(List.of(new Position("1", "Beratungsleistung", b("10"), "HUR", b("85.00"), null,
