@@ -27,6 +27,9 @@ public final class Einstellungen {
     /** BT-24 für neue Vorlagen. */
     public static final String SPEZIFIKATION = "xrechnung.spezifikation";
 
+    /** Größe des Logos in Prozent des größten Platzes im PDF-Kopf, siehe {@link #logo()}. */
+    public static final String LOGO_GROESSE = "pdf.logo.groesse";
+
     /** Zuletzt exportierte Rechnungsnummer, Grundlage für den nächsten Vorschlag. */
     public static final String LETZTE_NUMMER = "rechnungsnummer.letzte";
 
@@ -82,6 +85,20 @@ public final class Einstellungen {
     /** Adressbuch, siehe {@link openbilling.ods.Kunden}. */
     public Path kunden() {
         return ordner.resolve("kunden.ods");
+    }
+
+    /** Firmenlogo für die Sichtkopie (PDF), siehe {@link openbilling.pdf.Logo}; fehlt die Datei, gibt es keins. */
+    public Path logo() {
+        return ordner.resolve("logo.png");
+    }
+
+    /** {@link #LOGO_GROESSE}, Vorgabe 60 %. */
+    public int logoGroesse() {
+        try {
+            return Integer.parseInt(werte.getProperty(LOGO_GROESSE, "60").strip());
+        } catch (NumberFormatException e) {
+            return 60;
+        }
     }
 
     public String wert(String schluessel, String vorgabe) {

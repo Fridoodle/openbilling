@@ -5,6 +5,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.Locale;
 import openbilling.model.Berechnung;
 import openbilling.model.Rechnung;
@@ -25,8 +26,11 @@ final class Layout {
 
     private Layout() {}
 
-    /** @param pt Schriftgröße in Punkt; kleinere Werte bringen mehr Positionen auf eine Seite */
-    static String fo(Rechnung r, int pt) {
+    /**
+     * @param pt   Schriftgröße in Punkt; kleinere Werte bringen mehr Positionen auf eine Seite
+     * @param logo ersetzt den Firmennamen im Kopf, optional
+     */
+    static String fo(Rechnung r, int pt, Logo logo) {
         var e = Berechnung.berechne(r);
         String w = "EUR".equals(r.waehrung()) ? "€" : r.waehrung();
         String art = "381".equals(r.typ()) ? "Gutschrift" : "Rechnung";
@@ -43,10 +47,18 @@ final class Layout {
                 <fo:page-sequence master-reference="a4"><fo:flow flow-name="xsl-region-body">
                 """.formatted(pt));
 
-        // Kopf: Firmenname (OB-2), sonst Absendername.
+        // Kopf: Logo, sonst Firmenname (OB-2), sonst Absendername.
         // Der Abstand setzt die Empfängeranschrift ins Fenster eines DIN-Umschlags.
-        s.append("<fo:block font-size=\"16pt\" text-align=\"end\" space-after=\"20mm\">").append(x(r.kopfname()))
-                .append("</fo:block>\n");
+        if (logo == null) {
+            s.append("<fo:block font-size=\"16pt\" text-align=\"end\" space-after=\"20mm\">").append(x(r.kopfname()))
+                    .append("</fo:block>\n");
+        } else { // so hoch wie Name (16 pt × 1,25) und Abstand, damit die Anschrift an derselben Stelle steht
+            s.append("<fo:block-container height=\"20pt + 20mm\"><fo:block text-align=\"end\" line-height=\"0\">")
+                    .append(String.format(Locale.ROOT, "<fo:external-graphic content-width=\"%.2fmm\""
+                            + " content-height=\"%.2fmm\" src=\"url('data:image/png;base64,", logo.breite(), logo.hoehe()))
+                    .append(Base64.getEncoder().encodeToString(logo.png()))
+                    .append("')\"/></fo:block></fo:block-container>\n");
+        }
 
         // Anschriften
         var empf = new StringBuilder(marke("Rechnungsempfänger"));
