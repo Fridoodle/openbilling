@@ -40,9 +40,14 @@ public final class PdfExport {
 
     /** Hybrid-PDF: Sichtkopie mit eingebetteter XRechnung. {@code ciiXml} muss aus derselben Rechnung stammen. */
     public static byte[] hybrid(Rechnung r, String ciiXml) throws IOException {
+        return hybrid(r, ciiXml, null);
+    }
+
+    /** Wie {@link #hybrid(Rechnung, String)}, mit Logo im Kopf ({@code null}: ohne). */
+    public static byte[] hybrid(Rechnung r, String ciiXml, Logo logo) throws IOException {
         var out = new ByteArrayOutputStream();
         try (var exporter = new ZUGFeRDExporterFromPDFA()) {
-            exporter.load(sicht(r))
+            exporter.load(sicht(r, logo))
                     .setProducer("openbilling")
                     .setCreator("openbilling")
                     .setProfile(Profiles.getByName(profil(r)))
@@ -76,10 +81,15 @@ public final class PdfExport {
      * Passt die Rechnung in keiner Schriftgröße auf eine Seite, wird sie in der größten mehrseitig.
      */
     public static byte[] sicht(Rechnung r) throws IOException {
+        return sicht(r, null);
+    }
+
+    /** Wie {@link #sicht(Rechnung)}, mit Logo im Kopf ({@code null}: ohne). */
+    public static byte[] sicht(Rechnung r, Logo logo) throws IOException {
         byte[] mehrseitig = null;
         for (int pt : SCHRIFTGROESSEN) {
             var out = new ByteArrayOutputStream();
-            if (rendere(Layout.fo(r, pt), r.nummer(), out) == 1) {
+            if (rendere(Layout.fo(r, pt, logo), r.nummer(), out) == 1) {
                 return out.toByteArray();
             }
             if (mehrseitig == null) {

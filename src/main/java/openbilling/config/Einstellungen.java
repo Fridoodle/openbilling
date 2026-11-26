@@ -84,6 +84,11 @@ public final class Einstellungen {
         return ordner.resolve("kunden.ods");
     }
 
+    /** Firmenlogo für die Sichtkopie (PDF), siehe {@link openbilling.pdf.Logo}; fehlt die Datei, gibt es keins. */
+    public Path logo() {
+        return ordner.resolve("logo.png");
+    }
+
     public String wert(String schluessel, String vorgabe) {
         return werte.getProperty(schluessel, vorgabe);
     }

@@ -19,6 +19,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -37,6 +38,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -73,6 +75,7 @@ import openbilling.ods.Kunden;
 import openbilling.ods.RechnungOds;
 import openbilling.ods.RechnungOds.Entwurf;
 import openbilling.ods.RechnungOds.OdsFehler;
+import openbilling.pdf.Logo;
 import openbilling.pdf.PdfExport;
 import openbilling.pruefung.Pruefung;
 import openbilling.xml.CiiSchreiber;
@@ -88,7 +91,8 @@ public final class Fenster extends JFrame {
     private static final Pattern BT = Pattern.compile("BT-\\d+(?:-\\d+)?");
 
     private final Einstellungen einstellungen;
-    private final Formular formular = new Formular(this::ausAdressbuch, this::insAdressbuch);
+    private final Formular formular = new Formular(this::ausAdressbuch, this::insAdressbuch, this::waehleLogo,
+            this::entferneLogo);
     private final CardLayout karten = new CardLayout();
     private final JPanel inhalt = new JPanel(karten);
     private final JLabel status = Formular.gedaempft(new JLabel(" "));
@@ -160,6 +164,7 @@ public final class Fenster extends JFrame {
         setSize(Math.min(UIScale.scale(1180), flaeche.width), Math.min(UIScale.scale(860), flaeche.height));
         setMinimumSize(new Dimension(820, 560));
         setLocationRelativeTo(null);
+        zeigeLogo();
         zeigeStart();
     }
 
@@ -636,7 +641,8 @@ public final class Fenster extends JFrame {
         imHintergrund("Erzeuge das PDF …", () -> {
             String xml = CiiSchreiber.schreibe(r);
             List<String> m = mitXRechnung ? meldungen(xml) : List.<String>of();
-            return m.isEmpty() ? (Object) (mitXRechnung ? PdfExport.hybrid(r, xml) : PdfExport.sicht(r)) : m;
+            return m.isEmpty() ? (Object) (mitXRechnung ? PdfExport.hybrid(r, xml, logo()) : PdfExport.sicht(r, logo()))
+                    : m;
         }, ergebnis -> {
             if (ergebnis instanceof byte[] pdf) {
                 Path ziel = waehleZiel("pdf", e);
@@ -762,6 +768,52 @@ public final class Fenster extends JFrame {
                 }
             }
         }.execute();
+    }
+
+    // ------------------------------------------------------------ Logo
+
+    private Logo logo() throws IOException {
+        return Logo.lies(einstellungen.logo());
+    }
+
+    /** Bild wählen und zuschneiden; ersetzt im PDF den Firmennamen. */
+    private void waehleLogo() {
+        SystemFileChooser d = new SystemFileChooser(System.getProperty("user.home"));
+        d.setFileFilter(new SystemFileChooser.FileNameExtensionFilter("Bild (PNG, JPEG)", "png", "jpg", "jpeg",
+                "gif", "bmp"));
+        if (d.showOpenDialog(this) != SystemFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        versuche(() -> {
+            BufferedImage b = ImageIO.read(d.getSelectedFile());
+            if (b == null) {
+                throw new IOException("Kein unterstütztes Bild (PNG, JPEG, GIF, BMP): " + d.getSelectedFile().getName());
+            }
+            BufferedImage zugeschnitten = Zuschnitt.zeige(this, b);
+            if (zugeschnitten != null) {
+                Logo.speichere(zugeschnitten, einstellungen.logo());
+                zeigeLogo();
+                melde("Logo gespeichert: " + einstellungen.logo());
+            }
+        });
+    }
+
+    private void entferneLogo() {
+        if (versuche(() -> Files.deleteIfExists(einstellungen.logo()))) {
+            zeigeLogo();
+        }
+    }
+
+    private void zeigeLogo() {
+        BufferedImage b = null;
+        try {
+            if (Files.exists(einstellungen.logo())) {
+                b = ImageIO.read(einstellungen.logo().toFile());
+            }
+        } catch (IOException e) {
+            // unlesbar: wie ohne Logo anzeigen, der Export meldet den Fehler
+        }
+        formular.zeigeLogo(b);
     }
 
     // ------------------------------------------------------------ Adressbuch

@@ -13,6 +13,7 @@ import openbilling.model.Berechnung;
 import openbilling.model.Rechnung;
 import openbilling.ods.RechnungOds;
 import openbilling.ods.RechnungOds.OdsFehler;
+import openbilling.pdf.Logo;
 import openbilling.pdf.PdfExport;
 import openbilling.pruefung.Pruefung;
 import openbilling.xml.CiiSchreiber;
@@ -151,7 +152,7 @@ public final class Main {
         }
         Files.writeString(xmlDatei, xml, StandardCharsets.UTF_8);
         Rechnung r = RechnungOds.lese(datei);
-        Files.write(pdfDatei, PdfExport.hybrid(r, xml));
+        Files.write(pdfDatei, PdfExport.hybrid(r, xml, Logo.lies(einstellungen.logo())));
         einstellungen.merkeNummer(r.nummer());
         out.println("Geschrieben: " + xmlDatei);
         out.println("Geschrieben: " + pdfDatei + " (ZUGFeRD: PDF/A-3 mit eingebetteter "

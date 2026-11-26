@@ -2,18 +2,24 @@ package openbilling.pdf;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.IntStream;
+import javax.imageio.ImageIO;
 import openbilling.Testdaten;
 import openbilling.model.Rechnung.Steuerkategorie;
 import openbilling.xml.CiiSchreiber;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.junit.jupiter.api.Test;
 import org.mustangproject.validator.ZUGFeRDValidator;
 
@@ -157,6 +163,51 @@ class PdfExportTest {
             String text = new PDFTextStripper().getText(doc).replace("\r", "");
             assertTrue(text.startsWith(Testdaten.minimal().verkaeufer().name() + "\n"), text);
         }
+    }
+
+    @Test
+    void logoErsetztFirmennameUndLaesstAnschriftImFenster() throws Exception {
+        Path ordner = Files.createDirectories(Path.of("out/pdf"));
+        Path gespeichert = ordner.resolve("logo.png");
+        Logo.speichere(new BufferedImage(Logo.PIXEL_BREITE, Logo.PIXEL_HOEHE, BufferedImage.TYPE_INT_RGB), gespeichert);
+        Logo logo = Logo.lies(gespeichert);
+        assertEquals(Logo.BREITE, logo.breite(), 0.01);
+        assertEquals(Logo.HOEHE, logo.hoehe(), 0.01);
+        assertNull(Logo.lies(ordner.resolve("fehlt.png")));
+        // von Hand ersetzt, quadratisch: unverzerrt eingepasst
+        ImageIO.write(new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB), "png", gespeichert.toFile());
+        assertEquals(Logo.HOEHE, Logo.lies(gespeichert).breite(), 0.01);
+        logo = new Logo(Files.readAllBytes(gespeichert), Logo.HOEHE, Logo.HOEHE);
+
+        var r = Testdaten.mitFirmenname("Studio Beispiel");
+        byte[] mit = PdfExport.sicht(r, logo);
+        try (var doc = Loader.loadPDF(mit)) {
+            assertFalse(new PDFTextStripper().getText(doc).contains("Studio Beispiel"));
+        }
+        assertEquals(oben(PdfExport.sicht(r), "Rechnungsempfänger"), oben(mit, "Rechnungsempfänger"), 0.5);
+
+        Path datei = ordner.resolve("logo.pdf");
+        Files.write(datei, PdfExport.hybrid(r, CiiSchreiber.schreibe(r), logo));
+        var validator = new ZUGFeRDValidator();
+        String bericht = validator.validate(datei.toString());
+        assertTrue(validator.wasCompletelyValid(), bericht);
+    }
+
+    /** Abstand des ersten Vorkommens von {@code text} vom oberen Seitenrand in pt. */
+    private static float oben(byte[] pdf, String text) throws Exception {
+        float[] y = {-1};
+        try (var doc = Loader.loadPDF(pdf)) {
+            new PDFTextStripper() {
+                @Override
+                protected void writeString(String t, List<TextPosition> p) throws java.io.IOException {
+                    if (y[0] < 0 && t.contains(text)) {
+                        y[0] = p.get(0).getYDirAdj();
+                    }
+                }
+            }.getText(doc);
+        }
+        assertTrue(y[0] >= 0, text + " nicht gefunden");
+        return y[0];
     }
 
     @Test
