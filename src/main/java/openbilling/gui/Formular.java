@@ -165,7 +165,7 @@ final class Formular extends JPanel implements Scrollable {
         absender.add(zeile(feld("OB-2", "Firmenname im PDF-Kopf", "Absender"), 1));
         felder.get("OB-2").putClientProperty("JTextField.placeholderText", "wie Name");
         tipp("OB-2", "Steht groß oben rechts im PDF, nicht in der XRechnung. Bleibt das Feld leer, steht dort"
-                + " der Name.");
+                + " der Name. Ein Logo (Ansicht › PDF-Vorschau und Logo) ersetzt ihn.");
         partei(absender, "Absender", "BT-27", "BT-35", "BT-38", "BT-37", "BT-40", "BT-41", "BT-42", "BT-43", "BT-34");
         absender.add(zeile(feld("BT-31", "USt-IdNr.", "Absender"), 1, feld("BT-32", "Steuernummer", "Absender"), 1,
                 feld("BT-29", "Kennung", "Absender"), 1));
