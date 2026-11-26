@@ -8,7 +8,7 @@ E-Rechnungen nach **XRechnung** und **ZUGFeRD** erstellen, ohne Abo und ohne Clo
 - **Vorlagen und Adressbuch:** Eigene Daten einmal in eine Vorlage eintragen, Kunden im Adressbuch speichern.
 - **Fenster und Kommandozeile:** Hell- und Dunkelmodus, einstellbare Schriftgröße, dazu eine CLI für Skripte.
 
-> **Stand:** Version 1.2. XRechnung für Behörden und ZUGFeRD (Profil EN 16931) für Geschäftskunden. Unterstützt sind Rechnungen mit Überweisung, SEPA-Lastschrift, Karten-, Bar- und Onlinezahlung (z. B. PayPal), Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
+> **Stand:** Version 1.3. XRechnung für Behörden und ZUGFeRD (Profil EN 16931) für Geschäftskunden. Unterstützt sind Rechnungen mit Überweisung, SEPA-Lastschrift, Karten-, Bar- und Onlinezahlung (z. B. PayPal), Rabatten auf Positionen und auf die ganze Rechnung, Zuschlägen (z. B. Versand) und Skonto. Prüfe die ersten Rechnungen gegen, bevor du dich darauf verlässt.
 
 ## Installation (Windows)
 
@@ -30,7 +30,7 @@ Die Programmdateien sind noch nicht digital signiert. Windows SmartScreen zeigt 
 Wer sichergehen will, vergleicht die Prüfsumme der heruntergeladenen Datei mit der zugehörigen `.sha256` im Release:
 
 ```powershell
-Get-FileHash openbilling-1.2.0-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash openbilling-1.3.0-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm. Bitte melde es als [Issue](https://github.com/Fridoodle/openbilling/issues) mit dem Namen des Scanners.
@@ -46,6 +46,7 @@ Meldet ein Virenscanner das Programm, ist das sehr wahrscheinlich ein Fehlalarm.
    Rabatt auf eine Position gibst du in der Spalte **Rabatt %** ein. Rabatt und Zuschlag auf die ganze Rechnung (in Prozent oder als Betrag, z. B. Versand) sowie Skonto stehen unter **Rabatt, Zuschlag und Skonto**. Bei mehreren Steuersätzen verteilt openbilling Rabatt und Zuschlag anteilig.
    Unter **Zahlung → Zahlungsart** wählst du Überweisung, SEPA-Lastschrift, Kredit- oder Debitkarte, bar oder online. Für die Lastschrift trägst du deine Gläubiger-ID (am besten in der Vorlage) sowie Mandatsreferenz und IBAN des Kunden ein; die beiden letzten speichert das Adressbuch mit dem Kunden. Das PDF kündigt den Einzug mit Betrag und Fälligkeitsdatum an. Bei Kartenzahlung nur die letzten Ziffern der Karte eingeben, nie die ganze Nummer.
    Unter **Rechnung → Format** wählst du **XRechnung (Behörden)**, dann ist die Leitweg-ID Pflicht, oder **ZUGFeRD EN 16931 (Unternehmen)** für Geschäftskunden ohne Leitweg-ID.
+   Ein **Logo** wählst du beim Absender neben „Firmenname im PDF-Kopf“. Du schneidest es einmal zu (Bild ziehen, mit dem Mausrad zoomen); im PDF steht es dann oben rechts anstelle des Firmennamens. Es gilt für alle Rechnungen.
 3. **Datei → Speichern** legt die `.ods` ab, **Datei → Als E-Rechnung (XRechnung) exportieren** bzw. **(ZUGFeRD EN 16931)** (Strg+E) prüft und schreibt das ZUGFeRD-PDF.
 
 **Schrift zu klein?** Unter **Ansicht → Schriftgröße** lässt sich die ganze Oberfläche auf 110 bis 200 % vergrößern, auch mit Strg + und Strg − (Strg 0 setzt zurück). openbilling merkt sich die Größe.
