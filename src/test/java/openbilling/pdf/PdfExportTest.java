@@ -168,18 +168,16 @@ class PdfExportTest {
     @Test
     void logoErsetztFirmennameUndLaesstAnschriftImFenster() throws Exception {
         Path ordner = Files.createDirectories(Path.of("out/pdf"));
-        var bild = new BufferedImage(3000, 1000, BufferedImage.TYPE_INT_ARGB); // transparent, zu groß
-        ImageIO.write(bild, "png", ordner.resolve("logo-quelle.png").toFile());
         Path gespeichert = ordner.resolve("logo.png");
-        Logo.speichere(ordner.resolve("logo-quelle.png"), gespeichert);
-        var klein = ImageIO.read(gespeichert.toFile());
-        assertEquals(Logo.MAX_PIXEL, klein.getWidth());
-        assertFalse(klein.getColorModel().hasAlpha());
-
-        Logo logo = Logo.lies(gespeichert, 100);
-        assertEquals(72, logo.breite(), 0.01); // durch die Höhe begrenzt: 24 mm × 3
-        assertEquals(Logo.MAX_HOEHE, logo.hoehe(), 0.01);
-        assertNull(Logo.lies(ordner.resolve("fehlt.png"), 100));
+        Logo.speichere(new BufferedImage(Logo.PIXEL_BREITE, Logo.PIXEL_HOEHE, BufferedImage.TYPE_INT_RGB), gespeichert);
+        Logo logo = Logo.lies(gespeichert);
+        assertEquals(Logo.BREITE, logo.breite(), 0.01);
+        assertEquals(Logo.HOEHE, logo.hoehe(), 0.01);
+        assertNull(Logo.lies(ordner.resolve("fehlt.png")));
+        // von Hand ersetzt, quadratisch: unverzerrt eingepasst
+        ImageIO.write(new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB), "png", gespeichert.toFile());
+        assertEquals(Logo.HOEHE, Logo.lies(gespeichert).breite(), 0.01);
+        logo = new Logo(Files.readAllBytes(gespeichert), Logo.HOEHE, Logo.HOEHE);
 
         var r = Testdaten.mitFirmenname("Studio Beispiel");
         byte[] mit = PdfExport.sicht(r, logo);

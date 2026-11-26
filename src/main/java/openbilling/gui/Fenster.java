@@ -38,12 +38,12 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.ButtonGroup;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
@@ -59,7 +59,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
-import javax.swing.JSlider;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
@@ -80,9 +79,6 @@ import openbilling.pdf.Logo;
 import openbilling.pdf.PdfExport;
 import openbilling.pruefung.Pruefung;
 import openbilling.xml.CiiSchreiber;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
 
 /** Hauptfenster: Startseite mit Vorlagen, Rechnungsformular, Menü Datei / Adressbuch / Ansicht. */
 public final class Fenster extends JFrame {
@@ -95,7 +91,8 @@ public final class Fenster extends JFrame {
     private static final Pattern BT = Pattern.compile("BT-\\d+(?:-\\d+)?");
 
     private final Einstellungen einstellungen;
-    private final Formular formular = new Formular(this::ausAdressbuch, this::insAdressbuch);
+    private final Formular formular = new Formular(this::ausAdressbuch, this::insAdressbuch, this::waehleLogo,
+            this::entferneLogo);
     private final CardLayout karten = new CardLayout();
     private final JPanel inhalt = new JPanel(karten);
     private final JLabel status = Formular.gedaempft(new JLabel(" "));
@@ -108,8 +105,6 @@ public final class Fenster extends JFrame {
     private boolean offen;
     private boolean geaendert;
     private Pruefung pruefung;
-    private JDialog vorschau;
-    private final JPanel seiten = new JPanel();
 
     /** Öffnet das Fenster; mit {@code datei} gleich diese Rechnung, sonst die Startseite. */
     public static void starte(Einstellungen einstellungen, Path datei) {
@@ -169,6 +164,7 @@ public final class Fenster extends JFrame {
         setSize(Math.min(UIScale.scale(1180), flaeche.width), Math.min(UIScale.scale(860), flaeche.height));
         setMinimumSize(new Dimension(820, 560));
         setLocationRelativeTo(null);
+        zeigeLogo();
         zeigeStart();
     }
 
@@ -211,8 +207,6 @@ public final class Fenster extends JFrame {
         a.add(eintrag("Empfänger im Adressbuch speichern", 0, true, this::insAdressbuch));
 
         JMenu v = new JMenu("Ansicht");
-        v.add(eintrag("PDF-Vorschau und Logo…", KeyEvent.VK_R, true, this::zeigeVorschau));
-        v.addSeparator();
         JMenu groesse = new JMenu("Schriftgröße");
         ButtonGroup gruppe = new ButtonGroup();
         for (float f : GROESSEN) {
@@ -776,93 +770,50 @@ public final class Fenster extends JFrame {
         }.execute();
     }
 
-    // ------------------------------------------------------------ Vorschau und Logo
+    // ------------------------------------------------------------ Logo
 
     private Logo logo() throws IOException {
-        return Logo.lies(einstellungen.logo(), einstellungen.logoGroesse());
+        return Logo.lies(einstellungen.logo());
     }
 
-    /** Sichtkopie aus dem Formular in einem eigenen Fenster, darüber Logo und seine Größe. */
-    private void zeigeVorschau() {
-        if (vorschau == null) {
-            vorschau = new JDialog(this, "PDF-Vorschau", false);
-            JButton waehlen = new JButton("Logo wählen…");
-            waehlen.addActionListener(e -> waehleLogo());
-            JButton entfernen = new JButton("Logo entfernen");
-            entfernen.putClientProperty("JButton.buttonType", "borderless");
-            entfernen.addActionListener(e -> {
-                if (versuche(() -> Files.deleteIfExists(einstellungen.logo()))) {
-                    aktualisiereVorschau();
-                }
-            });
-            JSlider groesse = new JSlider(10, 100, Math.clamp(einstellungen.logoGroesse(), 10, 100));
-            groesse.setToolTipText("Größe des Logos oben rechts im PDF. Es ersetzt dort den Firmennamen.");
-            groesse.addChangeListener(e -> {
-                if (!groesse.getValueIsAdjusting() && versuche(() -> einstellungen.setze(Einstellungen.LOGO_GROESSE,
-                        String.valueOf(groesse.getValue())))) {
-                    aktualisiereVorschau();
-                }
-            });
-            JButton neu = new JButton("Aktualisieren");
-            neu.setToolTipText("Zeigt die Änderungen aus dem Formular");
-            neu.addActionListener(e -> aktualisiereVorschau());
-            JPanel leiste = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-            leiste.setBorder(Formular.rand(8, 8, 8, 8));
-            leiste.add(waehlen);
-            leiste.add(entfernen);
-            leiste.add(new JLabel("Größe"));
-            leiste.add(groesse);
-            leiste.add(neu);
-            seiten.setLayout(new BoxLayout(seiten, BoxLayout.Y_AXIS));
-            JScrollPane rollen = new JScrollPane(seiten);
-            rollen.getVerticalScrollBar().setUnitIncrement(UIScale.scale(24));
-            vorschau.add(leiste, BorderLayout.NORTH);
-            vorschau.add(rollen);
-            java.awt.Rectangle flaeche = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
-                    .getMaximumWindowBounds();
-            vorschau.setSize(Math.min(UIScale.scale(900), flaeche.width), Math.min(UIScale.scale(1000), flaeche.height));
-            vorschau.setLocationRelativeTo(this);
-        }
-        vorschau.setVisible(true);
-        aktualisiereVorschau();
-    }
-
-    private void aktualisiereVorschau() {
-        Rechnung r = vollstaendig();
-        if (r == null) {
-            return;
-        }
-        float dpi = 96 * UIScale.getUserScaleFactor();
-        imHintergrund("Erzeuge die Vorschau …", () -> {
-            try (PDDocument doc = Loader.loadPDF(PdfExport.sicht(r, logo()))) {
-                var maler = new PDFRenderer(doc);
-                List<BufferedImage> bilder = new ArrayList<>();
-                for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                    bilder.add(maler.renderImageWithDPI(i, dpi));
-                }
-                return bilder;
-            }
-        }, bilder -> {
-            seiten.removeAll();
-            for (BufferedImage b : bilder) {
-                JLabel seite = new JLabel(new ImageIcon(b));
-                seite.setAlignmentX(CENTER_ALIGNMENT);
-                seite.setBorder(Formular.rand(12, 12, 0, 12));
-                seiten.add(seite);
-            }
-            seiten.revalidate();
-            seiten.repaint();
-        });
-    }
-
+    /** Bild wählen und zuschneiden; ersetzt im PDF den Firmennamen. */
     private void waehleLogo() {
         SystemFileChooser d = new SystemFileChooser(System.getProperty("user.home"));
         d.setFileFilter(new SystemFileChooser.FileNameExtensionFilter("Bild (PNG, JPEG)", "png", "jpg", "jpeg",
                 "gif", "bmp"));
-        if (d.showOpenDialog(vorschau) == SystemFileChooser.APPROVE_OPTION
-                && versuche(() -> Logo.speichere(d.getSelectedFile().toPath(), einstellungen.logo()))) {
-            aktualisiereVorschau();
+        if (d.showOpenDialog(this) != SystemFileChooser.APPROVE_OPTION) {
+            return;
         }
+        versuche(() -> {
+            BufferedImage b = ImageIO.read(d.getSelectedFile());
+            if (b == null) {
+                throw new IOException("Kein unterstütztes Bild (PNG, JPEG, GIF, BMP): " + d.getSelectedFile().getName());
+            }
+            BufferedImage zugeschnitten = Zuschnitt.zeige(this, b);
+            if (zugeschnitten != null) {
+                Logo.speichere(zugeschnitten, einstellungen.logo());
+                zeigeLogo();
+                melde("Logo gespeichert: " + einstellungen.logo());
+            }
+        });
+    }
+
+    private void entferneLogo() {
+        if (versuche(() -> Files.deleteIfExists(einstellungen.logo()))) {
+            zeigeLogo();
+        }
+    }
+
+    private void zeigeLogo() {
+        BufferedImage b = null;
+        try {
+            if (Files.exists(einstellungen.logo())) {
+                b = ImageIO.read(einstellungen.logo().toFile());
+            }
+        } catch (IOException e) {
+            // unlesbar: wie ohne Logo anzeigen, der Export meldet den Fehler
+        }
+        formular.zeigeLogo(b);
     }
 
     // ------------------------------------------------------------ Adressbuch

@@ -7,8 +7,10 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -24,6 +26,7 @@ import java.util.regex.Pattern;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultCellEditor;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -141,7 +144,10 @@ final class Formular extends JPanel implements Scrollable {
     /** Wird nach jeder Eingabe aufgerufen. */
     Runnable beiAenderung = () -> {};
 
-    Formular(Runnable ausAdressbuch, Runnable insAdressbuch) {
+    private final JButton logo = new JButton("Logo wählen…");
+    private final JButton ohneLogo = new JButton("Entfernen");
+
+    Formular(Runnable ausAdressbuch, Runnable insAdressbuch, Runnable waehleLogo, Runnable entferneLogo) {
         super(new GridBagLayout());
         setBorder(rand(24, 32, 32, 32));
 
@@ -162,10 +168,23 @@ final class Formular extends JPanel implements Scrollable {
         zeigeFormat();
 
         JPanel absender = abschnitt("Absender", null);
-        absender.add(zeile(feld("OB-2", "Firmenname im PDF-Kopf", "Absender"), 1));
+        logo.addActionListener(e -> waehleLogo.run());
+        logo.setToolTipText("Bild oben rechts im PDF statt des Firmennamens. Gilt für alle Rechnungen.");
+        ohneLogo.putClientProperty("JButton.buttonType", "borderless");
+        ohneLogo.addActionListener(e -> entferneLogo.run());
+        JPanel knoepfe = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        knoepfe.add(logo);
+        knoepfe.add(ohneLogo);
+        JLabel logoTitel = gedaempft(new JLabel("Logo im PDF-Kopf"));
+        logoTitel.putClientProperty("FlatLaf.styleClass", "small");
+        JPanel logoFeld = new JPanel(new BorderLayout(0, 3));
+        logoFeld.add(logoTitel, BorderLayout.NORTH);
+        logoFeld.add(knoepfe);
+        absender.add(zeile(feld("OB-2", "Firmenname im PDF-Kopf", "Absender"), 1, logoFeld, 1));
         felder.get("OB-2").putClientProperty("JTextField.placeholderText", "wie Name");
         tipp("OB-2", "Steht groß oben rechts im PDF, nicht in der XRechnung. Bleibt das Feld leer, steht dort"
-                + " der Name. Ein Logo (Ansicht › PDF-Vorschau und Logo) ersetzt ihn.");
+                + " der Name.");
+        zeigeLogo(null);
         partei(absender, "Absender", "BT-27", "BT-35", "BT-38", "BT-37", "BT-40", "BT-41", "BT-42", "BT-43", "BT-34");
         absender.add(zeile(feld("BT-31", "USt-IdNr.", "Absender"), 1, feld("BT-32", "Steuernummer", "Absender"), 1,
                 feld("BT-29", "Kennung", "Absender"), 1));
@@ -516,6 +535,17 @@ final class Formular extends JPanel implements Scrollable {
     static JLabel gedaempft(JLabel l) {
         l.putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground");
         return l;
+    }
+
+    /** Zeigt das Logo verkleinert auf dem Knopf; mit Logo steht im PDF kein Firmenname, das Feld ruht dann. */
+    void zeigeLogo(BufferedImage bild) {
+        boolean da = bild != null;
+        logo.setIcon(da ? new ImageIcon(bild.getScaledInstance(-1, UIScale.scale(20), Image.SCALE_SMOOTH)) : null);
+        logo.setText(da ? "Ändern…" : "Logo wählen…");
+        ohneLogo.setVisible(da);
+        JTextComponent name = felder.get("OB-2");
+        name.setEnabled(!da);
+        name.putClientProperty("JTextField.placeholderText", da ? "Logo statt Name" : "wie Name");
     }
 
     private void tipp(String bt, String text) {

@@ -152,7 +152,7 @@ public final class Main {
         }
         Files.writeString(xmlDatei, xml, StandardCharsets.UTF_8);
         Rechnung r = RechnungOds.lese(datei);
-        Files.write(pdfDatei, PdfExport.hybrid(r, xml, Logo.lies(einstellungen.logo(), einstellungen.logoGroesse())));
+        Files.write(pdfDatei, PdfExport.hybrid(r, xml, Logo.lies(einstellungen.logo())));
         einstellungen.merkeNummer(r.nummer());
         out.println("Geschrieben: " + xmlDatei);
         out.println("Geschrieben: " + pdfDatei + " (ZUGFeRD: PDF/A-3 mit eingebetteter "
